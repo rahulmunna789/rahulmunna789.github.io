@@ -1,12 +1,1 @@
-{
-  "name": "insurance-prototype-demo",
-  "private": true,
-  "version": "0.0.1",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:docs": "npm run build && node scripts/sync-docs.mjs",
-    "preview": "vite preview"
-  }
-}
+{ "name": "insurance-prototype-demo", "private": true, "version": "0.0.1", "type": "module", "scripts": { "dev": "vite", "build": "tsc -b && vite build", "build:docs": "npm run build && cp -r dist docs", "preview": "vite preview" } }
