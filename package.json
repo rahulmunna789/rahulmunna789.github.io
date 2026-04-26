@@ -1,1 +1,23 @@
-{ "name": "insurance-prototype-demo", "private": true, "version": "0.0.1", "type": "module", "scripts": { "dev": "vite", "build": "tsc -b && vite build", "build:docs": "npm run build && cp -r dist docs", "preview": "vite preview" } }
+{
+  "name": "insurance-prototype-demo",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:docs": "npm run build && node scripts/sync-docs.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.10"
+  }
+}

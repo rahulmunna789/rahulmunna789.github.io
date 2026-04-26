@@ -32,6 +32,32 @@ const SL = ({ch,col}: any) => (
   <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.15em',color:col||C.sec}}>{ch}</p>
 );
 
+/** Compact icon action for code cards (copy / edit / link / remove). */
+const CodeIconBtn = ({icon, onClick, title, danger}: any) => (
+  <button
+    type="button"
+    title={title}
+    onClick={onClick}
+    style={{
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      border: `1px solid ${danger ? `${C.e}55` : `${C.oV}55`}`,
+      background: danger ? `${C.eC}40` : C.s0,
+      color: danger ? C.e : C.oSV,
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      flexShrink: 0,
+      transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
+    }}
+  >
+    <Ic n={icon} s={17} col={danger ? C.e : C.oSV} />
+  </button>
+);
+
 const CTA = ({ch,onClick,disabled,full,icon,sm,red}: any) => (
   <button onClick={onClick} disabled={disabled} style={{
     background:disabled?C.oV:red?C.e:VG, color:'#fff', fontWeight:700,
@@ -1134,8 +1160,12 @@ function TreatmentRev({booking,sent,state,setState,onSend,onBack}: any) {
 function MedicodePlatform({state,setState,advance}: any) {
   const [view,setView] = useState('dashboard');
   const [codeState,setCodeState] = useState({});
+  const [auxCodes,setAuxCodes] = useState<any[]>([]);
+  const [removedCodes,setRemovedCodes] = useState<string[]>([]);
   const [fraudDone,setFraudDone] = useState(false);
   const [fraudLoading,setFraudLoading] = useState(false);
+
+  const mergedCodes = [...CODES, ...auxCodes].filter((c) => !removedCodes.includes(c.code));
 
   const nav = [
     {id:'dashboard',ic:'dashboard',lbl:'Dashboard'},
@@ -1149,11 +1179,14 @@ function MedicodePlatform({state,setState,advance}: any) {
 
   const navActive = view==='coding'||view==='adjudication'?'workbench':view;
 
-  const handleCode = (code,action) => {
-    setCodeState(p=>({...p,[code]:action}));
-    const codes = CODES.filter(c=>!c.suggest);
-    const allDone = codes.every(c=>codeState[c.code]||c.code===code);
-    if(allDone) advance(8);
+  const handleCode = (code, action) => {
+    setCodeState((p) => {
+      const next = { ...p, [code]: action };
+      const pending = mergedCodes.filter((c) => !c.suggest);
+      const allDone = pending.every((c) => next[c.code] || c.code === code);
+      if (allDone) queueMicrotask(() => advance(8));
+      return next;
+    });
   };
 
   const runFraud = () => {
@@ -1161,7 +1194,7 @@ function MedicodePlatform({state,setState,advance}: any) {
     setTimeout(()=>{setFraudLoading(false);setFraudDone(true);advance(9);},1800);
   };
 
-  const allAccepted = CODES.filter(c=>!c.suggest).every(c=>codeState[c.code]==='accepted');
+  const allAccepted = mergedCodes.filter((c) => !c.suggest).every((c) => codeState[c.code] === "accepted");
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
@@ -1174,6 +1207,13 @@ function MedicodePlatform({state,setState,advance}: any) {
         {(view==='coding'||view==='workbench')&&
           <CodingWorkbench state={state} setState={setState} codeState={codeState} onCode={handleCode} fraudDone={fraudDone}
             fraudLoading={fraudLoading} onRunFraud={runFraud} allAccepted={allAccepted}
+            codesList={mergedCodes}
+            onAddCode={()=>setAuxCodes((ac:any[])=>[...ac,{
+              type:'ICD-10-CM', code:`Z9${Date.now().toString(36).slice(-4).toUpperCase()}`,
+              desc:'Additional coding line (demo). Use link icon to open an external code reference.',
+              conf:76, col:C.p,
+            }])}
+            onRemoveCode={(codeStr:string)=>setRemovedCodes((r)=>[...r, codeStr])}
             onPush={()=>{advance(10);setState(s=>({...s,claimStatus:'submitted'}));}}/>}
         {view==='adjudication'&&<ClaimAdj state={state} advance={advance}/>}
       </div>
@@ -1318,7 +1358,22 @@ function MediDash({state,setState,onWorkbench,onAdj}: any) {
   );
 }
 
-function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading,onRunFraud,allAccepted,onPush}: any) {
+function CodingWorkbench({
+  state,
+  setState,
+  codeState,
+  onCode,
+  fraudDone,
+  fraudLoading,
+  onRunFraud,
+  allAccepted,
+  onPush,
+  codesList = CODES,
+  onAddCode,
+  onRemoveCode,
+}: any) {
+  const [codeFilter, setCodeFilter] = useState("");
+  const [sortNewest, setSortNewest] = useState(true);
   const scenario = state.demoScenario || 'healthy';
   const segs = [
     {t:'Patient presents with ',n:true},
@@ -1344,6 +1399,21 @@ function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading
   const hMap = {blue:{bg:'#dbeafe',c:'#1e40af',b:'#3b82f6'},amber:{bg:'#fef3c7',c:'#92400e',b:'#f59e0b'},green:{bg:C.tF,c:C.t,b:C.t},gray:{bg:C.sX,c:C.oS,b:C.oV}};
   const scenarioMeta = SCENARIO_META[scenario];
   const canSubmit = fraudDone && allAccepted && scenario!=='missingDocs' && scenario!=='consentHold' && scenario!=='lowConfidence';
+  const q = codeFilter.trim().toLowerCase();
+  const filteredCodes = codesList.filter(
+    (c) => !q || c.code.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
+  );
+  const sortedCodes = [...filteredCodes].sort((a, b) =>
+    sortNewest ? b.code.localeCompare(a.code) : a.code.localeCompare(b.code)
+  );
+  const copyCodeLine = (c: any) => {
+    const line = `${c.code}\t${c.desc}`;
+    if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(line);
+  };
+  const openCodeReference = (c: any) => {
+    const u = `https://www.icd10data.com/search?s=${encodeURIComponent(c.code)}`;
+    window.open(u, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 96px)'}}>
@@ -1401,27 +1471,67 @@ function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading
           </div>
         </section>
 
-        {/* Coding Panel */}
-        <section style={{width:400,background:C.sL,display:'flex',flexDirection:'column',flexShrink:0}}>
-          <div style={{padding:'18px 22px',borderBottom:`1px solid ${C.oV}20`,
-            background:'rgba(255,255,255,0.65)',backdropFilter:'blur(12px)',
+        {/* Coding Panel — layout aligned with medical coding portals (codes list + icon actions) */}
+        <section style={{width:420,background:C.sL,display:'flex',flexDirection:'column',flexShrink:0}}>
+          <div style={{padding:'16px 18px',borderBottom:`1px solid ${C.oV}20`,
+            background:'rgba(255,255,255,0.72)',backdropFilter:'blur(12px)',
             WebkitBackdropFilter:'blur(12px)',position:'sticky',top:0,zIndex:10}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-              <h3 style={{fontWeight:700,fontSize:16,color:C.p}}>Auto-Coding View</h3>
-              <Bdg ch="AI Assisted" bg={`rgba(0,72,141,0.1)`} col={C.p}/>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <h3 style={{fontWeight:800,fontSize:17,color:C.oS,margin:0,letterSpacing:'-0.02em'}}>Codes</h3>
+                <Bdg ch="AI Assisted" bg="rgba(0,72,141,0.1)" col={C.p} s={9}/>
+              </div>
+              {onAddCode && (
+                <button type="button" onClick={onAddCode} style={{
+                  background:C.pC,color:'#fff',fontWeight:700,fontSize:12,padding:'8px 16px',borderRadius:8,
+                  border:'none',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,95,184,0.35)',display:'inline-flex',alignItems:'center',gap:6,
+                }}>
+                  <Ic n="add" s={16} col="#fff"/>Add
+                </button>
+              )}
             </div>
-            <p style={{fontSize:11,color:C.out,fontStyle:'italic'}}>Generated {CODES.length} codes from narrative analysis.</p>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <Ic n="filter_list" s={16} col={C.out}/>
+              <input
+                value={codeFilter}
+                onChange={(e)=>setCodeFilter(e.target.value)}
+                placeholder="Filter codes…"
+                style={{
+                  flex:1,fontSize:12,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.oV}55`,
+                  background:C.s0,outline:'none',color:C.oS,
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={()=>setSortNewest((v)=>!v)}
+              style={{
+                width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
+                padding:'8px 10px',borderRadius:8,border:`1px solid ${C.oV}40`,background:C.s0,
+                cursor:'pointer',fontSize:11,fontWeight:600,color:C.oSV,
+              }}
+            >
+              <span style={{display:'flex',alignItems:'center',gap:6}}>
+                <Ic n="sort" s={16} col={C.p}/>
+                Sort: {sortNewest ? "newest → oldest" : "oldest → newest"}
+              </span>
+              <Ic n="expand_more" s={18} col={C.out}/>
+            </button>
+            <p style={{fontSize:10,color:C.out,margin:'10px 0 0',fontStyle:'italic'}}>
+              {sortedCodes.length} of {codesList.length} codes · narrative-generated
+            </p>
           </div>
           <div style={{flex:1,overflowY:'auto',padding:14,display:'flex',flexDirection:'column',gap:12}}>
-            {CODES.map(code=>(
-              <div key={code.code} style={{background:C.s0,borderRadius:14,padding:16,
-                boxShadow:'0 2px 8px rgba(0,0,0,0.04)',
+            {sortedCodes.map((code)=>(
+              <div key={code.code} style={{background:C.s0,borderRadius:14,padding:14,
+                boxShadow:'0 2px 8px rgba(0,0,0,0.05)',
+                border:`1px solid ${C.oV}35`,
                 borderLeft:`4px solid ${codeState[code.code]==='accepted'?C.t:code.suggest?C.p:code.col}`,
                 transition:'border-color 0.2s'}}>
                 {code.suggest?(
                   <div style={{display:'flex',gap:10}}>
                     <Ic n="lightbulb" f={1} s={18} col={C.p}/>
-                    <div>
+                    <div style={{flex:1}}>
                       <p style={{fontSize:9,fontWeight:700,color:C.p,textTransform:'uppercase',marginBottom:4}}>AI Suggestion</p>
                       <p style={{fontSize:12,color:C.oSV,lineHeight:1.5}}>{code.desc}</p>
                       <button onClick={()=>onCode(code.code,'accepted')}
@@ -1431,24 +1541,47 @@ function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading
                   </div>
                 ):(
                   <>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-                      <div>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:6}}>
+                      <div style={{minWidth:0}}>
                         <span style={{fontSize:9,fontWeight:700,color:C.out,textTransform:'uppercase',
                           letterSpacing:'0.1em',display:'block',marginBottom:3}}>{code.type}</span>
-                        <span style={{fontSize:22,fontWeight:900,color:C.oS,letterSpacing:'-0.02em'}}>{code.code}</span>
+                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                          <span style={{fontSize:20,fontWeight:900,color:C.oS,letterSpacing:'-0.02em'}}>{code.code}</span>
+                          {codeState[code.code] !== "accepted" && (
+                            <Bdg ch="Predicted" bg="#e0f2fe" col={C.pC} s={9}/>
+                          )}
+                          {codeState[code.code] === "accepted" && (
+                            <Bdg ch="Confirmed" bg={C.tF} col={C.t} s={9}/>
+                          )}
+                          {codeState[code.code] === "edited" && (
+                            <Bdg ch="Edited" bg={C.sFx} col={C.sec} s={9}/>
+                          )}
+                        </div>
                       </div>
-                      <div style={{textAlign:'right'}}>
-                        <span style={{fontSize:11,fontWeight:700,
-                          color:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=90?C.t:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=75?'#d97706':C.e}}>{scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf}% Confidence</span>
-                        <div style={{width:72,height:4,background:C.sX,borderRadius:2,overflow:'hidden',marginTop:4}}>
+                      <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                        <CodeIconBtn icon="content_copy" title="Copy code" onClick={()=>copyCodeLine(code)} />
+                        <CodeIconBtn icon="edit" title="Mark edited" onClick={()=>onCode(code.code,"edited")} />
+                        <CodeIconBtn icon="open_in_new" title="Open reference" onClick={()=>openCodeReference(code)} />
+                        {onRemoveCode && (
+                          <CodeIconBtn icon="close" title="Remove from list" danger onClick={()=>onRemoveCode(code.code)} />
+                        )}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:10,marginBottom:8}}>
+                      <p style={{fontSize:12,color:C.oSV,lineHeight:1.45,margin:0,flex:1}}>{code.desc}</p>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        <span style={{fontSize:10,fontWeight:700,
+                          color:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=90?C.t:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=75?'#d97706':C.e}}>
+                          {scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf}%
+                        </span>
+                        <div style={{width:64,height:4,background:C.sX,borderRadius:2,overflow:'hidden',marginTop:4}}>
                           <div style={{height:'100%',width:`${scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf}%`,borderRadius:2,
                             background:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=90?C.t:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=75?'#d97706':C.e}}/>
                         </div>
                       </div>
                     </div>
-                    <p style={{fontSize:12,color:C.oSV,lineHeight:1.4,marginBottom:12}}>{code.desc}</p>
                     <div style={{display:'flex',gap:8}}>
-                      <button onClick={()=>onCode(code.code,'accepted')} style={{flex:1,padding:'7px 0',
+                      <button type="button" onClick={()=>onCode(code.code,'accepted')} style={{flex:1,padding:'8px 0',
                         background:codeState[code.code]==='accepted'?C.tF:`rgba(0,84,40,0.08)`,
                         color:C.t,fontWeight:700,fontSize:11,borderRadius:8,
                         border:codeState[code.code]==='accepted'?`1px solid ${C.t}40`:'none',cursor:'pointer',
@@ -1456,7 +1589,7 @@ function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading
                         {codeState[code.code]==='accepted'&&<Ic n="check" s={11} col={C.t}/>}
                         {codeState[code.code]==='accepted'?'Accepted':'Accept'}
                       </button>
-                      <button onClick={()=>onCode(code.code,'edited')} style={{flex:1,padding:'7px 0',
+                      <button type="button" onClick={()=>onCode(code.code,'edited')} style={{flex:1,padding:'8px 0',
                         background:C.sM,color:C.oSV,fontWeight:700,fontSize:11,borderRadius:8,border:'none',cursor:'pointer'}}>
                         Edit
                       </button>
