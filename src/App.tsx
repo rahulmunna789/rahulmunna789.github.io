@@ -32,32 +32,6 @@ const SL = ({ch,col}: any) => (
   <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.15em',color:col||C.sec}}>{ch}</p>
 );
 
-/** Compact icon action for code cards (copy / edit / link / remove). */
-const CodeIconBtn = ({icon, onClick, title, danger}: any) => (
-  <button
-    type="button"
-    title={title}
-    onClick={onClick}
-    style={{
-      width: 32,
-      height: 32,
-      borderRadius: 8,
-      border: `1px solid ${danger ? `${C.e}55` : `${C.oV}55`}`,
-      background: danger ? `${C.eC}40` : C.s0,
-      color: danger ? C.e : C.oSV,
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 0,
-      flexShrink: 0,
-      transition: "background 0.15s, border-color 0.15s, opacity 0.15s",
-    }}
-  >
-    <Ic n={icon} s={17} col={danger ? C.e : C.oSV} />
-  </button>
-);
-
 const CTA = ({ch,onClick,disabled,full,icon,sm,red}: any) => (
   <button onClick={onClick} disabled={disabled} style={{
     background:disabled?C.oV:red?C.e:VG, color:'#fff', fontWeight:700,
@@ -85,7 +59,7 @@ const NavItem = ({icon,label,active,onClick}: any) => (
 );
 
 /* ── LAYOUT SHELLS ───────────────────────────────────────────── */
-function Sidebar({items,active,onNav,sub}: any) {
+function Sidebar({items,active,onNav,sub,onNewEntry,onSignOut}: any) {
   return (
     <aside style={{width:240,height:'calc(100vh - 44px)',background:C.sL,display:'flex',
       flexDirection:'column',padding:'24px 16px',position:'fixed',left:0,top:44,zIndex:40}}>
@@ -103,12 +77,12 @@ function Sidebar({items,active,onNav,sub}: any) {
         {items.map(i=><NavItem key={i.id} icon={i.ic} label={i.lbl} active={active===i.id} onClick={()=>onNav(i.id)}/>)}
       </nav>
       <div style={{borderTop:`1px solid ${C.oV}40`,paddingTop:16,marginTop:12}}>
-        <button style={{width:'100%',padding:'10px 16px',borderRadius:10,background:VG,color:'#fff',
+        <button onClick={onNewEntry} style={{width:'100%',padding:'10px 16px',borderRadius:10,background:VG,color:'#fff',
           fontWeight:700,fontSize:13,border:'none',cursor:'pointer',marginBottom:6,
           boxShadow:'0 4px 12px rgba(0,72,141,0.25)',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
           <Ic n="add" s={16} col="#fff"/>New Entry
         </button>
-        <button style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',color:C.oSV,
+        <button onClick={onSignOut} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',color:C.oSV,
           fontSize:13,background:'transparent',border:'none',cursor:'pointer',width:'100%'}}>
           <Ic n="logout" s={16}/>Sign Out
         </button>
@@ -117,7 +91,7 @@ function Sidebar({items,active,onNav,sub}: any) {
   );
 }
 
-function TopBar() {
+function TopBar({onNotifications}: any) {
   return (
     <header style={{position:'fixed',top:44,left:240,right:0,zIndex:30,...gl,
       boxShadow:'0 1px 3px rgba(0,0,0,0.06)',display:'flex',justifyContent:'space-between',
@@ -131,7 +105,7 @@ function TopBar() {
         </div>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <button style={{background:'transparent',border:'none',cursor:'pointer',color:C.oSV,
+        <button onClick={onNotifications} style={{background:'transparent',border:'none',cursor:'pointer',color:C.oSV,
           position:'relative',padding:6,display:'flex'}}>
           <Ic n="notifications" s={20}/>
           <span style={{position:'absolute',top:8,right:8,width:6,height:6,background:C.p,borderRadius:'50%'}}/>
@@ -360,6 +334,13 @@ function applyStateUpdate(setState: any, updater: (prev: any) => any, activity?:
   });
 }
 
+function setUiNotice(setState: any, message: string, tone = C.p) {
+  applyStateUpdate(setState, (prev:any)=>({
+    ...prev,
+    uiNotice: { id: `${Date.now()}`, message, tone },
+  }), { actor:'Demo UI', text:message, tone });
+}
+
 function ScenarioToggle({scenario,setScenario}: any) {
   return (
     <div style={{background:C.s0,borderRadius:16,padding:18,boxShadow:'0 2px 8px rgba(0,0,0,0.04)'}}>
@@ -522,71 +503,176 @@ function ActivityTimeline({items,title='Activity Timeline'}: any) {
   );
 }
 
+function ActionBanner({notice,onDismiss}: any) {
+  if (!notice) return null;
+  return (
+    <div style={{marginBottom:18,background:`linear-gradient(135deg, ${notice.tone}15 0%, rgba(255,255,255,0.92) 100%)`,border:`1px solid ${notice.tone}40`,borderRadius:14,padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{width:10,height:10,borderRadius:'50%',background:notice.tone,flexShrink:0}}/>
+        <p style={{fontSize:12,fontWeight:700,color:C.oS}}>{notice.message}</p>
+      </div>
+      <button onClick={onDismiss} style={{background:'transparent',border:'none',cursor:'pointer',color:C.oSV,display:'flex'}}>
+        <Ic n="close" s={16}/>
+      </button>
+    </div>
+  );
+}
+
+function PortalModulePage({eyebrow,title,summary,stats,actions,children}: any) {
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:20}}>
+      <div style={{background:C.s0,borderRadius:16,padding:24,boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
+        <SL ch={eyebrow}/>
+        <h1 style={{fontSize:34,fontWeight:900,color:C.oS,letterSpacing:'-0.02em',marginTop:4}}>{title}</h1>
+        <p style={{fontSize:14,color:C.oSV,lineHeight:1.6,marginTop:8,maxWidth:760}}>{summary}</p>
+        {stats && (
+          <div style={{display:'grid',gridTemplateColumns:`repeat(${stats.length}, minmax(0,1fr))`,gap:12,marginTop:18}}>
+            {stats.map((stat:any)=>(
+              <div key={stat.l} style={{background:C.sL,borderRadius:12,padding:14}}>
+                <p style={{fontSize:9,fontWeight:700,color:C.out,textTransform:'uppercase',letterSpacing:'0.12em'}}>{stat.l}</p>
+                <p style={{fontSize:24,fontWeight:900,color:stat.c || C.oS,marginTop:4}}>{stat.v}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {actions && (
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:16}}>
+            {actions}
+          </div>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function PatientApp({state,setState,advance}: any) {
   const consentRecovered = !!state.consentRecovered;
-  return (
-    <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar items={[
-        {id:'overview',ic:'space_dashboard',lbl:'Overview'},
-        {id:'appointments',ic:'event_available',lbl:'Appointments'},
-        {id:'consent',ic:'verified_user',lbl:'Consent Center'},
-        {id:'claims',ic:'receipt_long',lbl:'Claims'},
-        {id:'messages',ic:'chat',lbl:'Messages'},
-      ]} active="overview" onNav={()=>{}} sub="Patient"/>
-      <TopBar/>
-      <div style={{marginLeft:240,marginTop:96,flex:1,padding:32,background:C.s,minHeight:'calc(100vh - 96px)'}}>
-        <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:22,alignItems:'start'}}>
-          <div style={{display:'flex',flexDirection:'column',gap:20}}>
-            <div style={{background:C.s0,borderRadius:20,padding:26,boxShadow:'0 4px 18px rgba(0,0,0,0.05)'}}>
-              <SL ch="Patient App"/>
-              <h1 style={{fontSize:34,fontWeight:900,color:C.oS,letterSpacing:'-0.02em',marginTop:4}}>Member Claim Companion</h1>
-              <p style={{fontSize:14,color:C.oSV,lineHeight:1.65,marginTop:8,maxWidth:620}}>
-                A dedicated patient-facing view for appointments, consent recovery, status tracking, and communications before the hospital begins claim review.
-              </p>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginTop:18}}>
-                {[
-                  {l:'Current claim',v:state.claimStatus || 'Pre-auth pending',c:C.p},
-                  {l:'Consent status',v:consentRecovered?'Active':'Needs action',c:consentRecovered?C.t:'#d97706'},
-                  {l:'Hospital booking',v:'Apollo Hospitals',c:C.sec},
-                ].map(card=>(
-                  <div key={card.l} style={{background:C.sL,borderRadius:14,padding:16}}>
-                    <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>{card.l}</p>
-                    <p style={{fontSize:20,fontWeight:900,color:card.c,marginTop:4}}>{card.v}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <ConsentRecoveryCard state={state} setState={setState}/>
-            <div style={{background:C.s0,borderRadius:20,padding:24,boxShadow:'0 4px 18px rgba(0,0,0,0.05)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-                <div>
-                  <SL ch="Patient Timeline"/>
-                  <h3 style={{fontSize:18,fontWeight:800,color:C.oS,marginTop:4}}>Claim & appointment milestones</h3>
+  const [view,setView] = useState('overview');
+  const patientNav = [
+    {id:'overview',ic:'space_dashboard',lbl:'Overview'},
+    {id:'appointments',ic:'event_available',lbl:'Appointments'},
+    {id:'consent',ic:'verified_user',lbl:'Consent Center'},
+    {id:'claims',ic:'receipt_long',lbl:'Claims'},
+    {id:'messages',ic:'chat',lbl:'Messages'},
+  ];
+  const patientViews:any = {
+    overview: (
+      <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:22,alignItems:'start'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:20}}>
+          <div style={{background:C.s0,borderRadius:20,padding:26,boxShadow:'0 4px 18px rgba(0,0,0,0.05)'}}>
+            <SL ch="Patient App"/>
+            <h1 style={{fontSize:34,fontWeight:900,color:C.oS,letterSpacing:'-0.02em',marginTop:4}}>Member Claim Companion</h1>
+            <p style={{fontSize:14,color:C.oSV,lineHeight:1.65,marginTop:8,maxWidth:620}}>
+              A dedicated patient-facing view for appointments, consent recovery, status tracking, and communications before the hospital begins claim review.
+            </p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginTop:18}}>
+              {[
+                {l:'Current claim',v:state.claimStatus || 'Pre-auth pending',c:C.p},
+                {l:'Consent status',v:consentRecovered?'Active':'Needs action',c:consentRecovered?C.t:'#d97706'},
+                {l:'Hospital booking',v:'Apollo Hospitals',c:C.sec},
+              ].map(card=>(
+                <div key={card.l} style={{background:C.sL,borderRadius:14,padding:16}}>
+                  <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>{card.l}</p>
+                  <p style={{fontSize:20,fontWeight:900,color:card.c,marginTop:4}}>{card.v}</p>
                 </div>
-                <Bdg ch={`Step ${state.currentStep}/13`} bg={C.pFx} col={C.p}/>
-              </div>
-              <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {STATUS_STEPS.slice(0, Math.max(state.currentStep, 5)).map((step:any)=>(
-                  <div key={step.id} style={{display:'flex',alignItems:'center',gap:10}}>
-                    <span style={{width:12,height:12,borderRadius:'50%',background:state.currentStep >= step.id ? C.t : C.oV,flexShrink:0}}/>
-                    <div>
-                      <p style={{fontSize:13,fontWeight:700,color:C.oS}}>{step.lbl}</p>
-                      <p style={{fontSize:10,color:C.oSV,marginTop:2}}>{step.prt}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:'flex',gap:10,marginTop:16,flexWrap:'wrap'}}>
-                <CTA ch="Complete profile & insurance" onClick={()=>applyStateUpdate(setState, (s:any)=>({...s,currentStep:Math.max(s.currentStep,2)}), { actor:'Patient App', text:'Patient completed profile and insurance details', tone:C.t })} sm icon="task_alt"/>
-                <CTA ch="Book hospital slot" onClick={()=>applyStateUpdate(setState, (s:any)=>({...s,currentStep:Math.max(s.currentStep,2)}), { actor:'Patient App', text:'Patient booked hospital appointment and shared policy info', tone:C.p })} sm icon="event_available"/>
-              </div>
+              ))}
             </div>
           </div>
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            <ScenarioToggle scenario={state.demoScenario || 'healthy'} setScenario={(demoScenario:any)=>setState((s:any)=>({...s,demoScenario}))}/>
-            <ActivityTimeline items={state.activities} title="Patient-visible activity"/>
+          <div style={{background:C.s0,borderRadius:20,padding:24,boxShadow:'0 4px 18px rgba(0,0,0,0.05)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <div>
+                <SL ch="Patient Timeline"/>
+                <h3 style={{fontSize:18,fontWeight:800,color:C.oS,marginTop:4}}>Claim & appointment milestones</h3>
+              </div>
+              <Bdg ch={`Step ${state.currentStep}/13`} bg={C.pFx} col={C.p}/>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {STATUS_STEPS.slice(0, Math.max(state.currentStep, 5)).map((step:any)=>(
+                <div key={step.id} style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{width:12,height:12,borderRadius:'50%',background:state.currentStep >= step.id ? C.t : C.oV,flexShrink:0}}/>
+                  <div>
+                    <p style={{fontSize:13,fontWeight:700,color:C.oS}}>{step.lbl}</p>
+                    <p style={{fontSize:10,color:C.oSV,marginTop:2}}>{step.prt}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:10,marginTop:16,flexWrap:'wrap'}}>
+              <CTA ch="Complete profile & insurance" onClick={()=>applyStateUpdate(setState, (s:any)=>({...s,currentStep:Math.max(s.currentStep,2)}), { actor:'Patient App', text:'Patient completed profile and insurance details', tone:C.t })} sm icon="task_alt"/>
+              <CTA ch="Book hospital slot" onClick={()=>applyStateUpdate(setState, (s:any)=>({...s,currentStep:Math.max(s.currentStep,2), selectedHospital:{name:'Apollo Hospitals'}}), { actor:'Patient App', text:'Patient booked hospital appointment and shared policy info', tone:C.p })} sm icon="event_available"/>
+            </div>
           </div>
         </div>
+        <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <ScenarioToggle scenario={state.demoScenario || 'healthy'} setScenario={(demoScenario:any)=>setState((s:any)=>({...s,demoScenario}))}/>
+          <ActivityTimeline items={state.activities} title="Patient-visible activity"/>
+        </div>
+      </div>
+    ),
+    appointments: (
+      <PortalModulePage
+        eyebrow="Patient App"
+        title="Appointments"
+        summary="Track scheduled consultations, hospital arrival details, and prep steps before the claim enters the provider queue."
+        stats={[{l:'Upcoming',v:'1',c:C.p},{l:'Documents',v:`${(state.uploadedDocs||[]).length}`,c:C.t},{l:'Prep status',v:'Ready',c:C.sec}]}
+        actions={[
+          <CTA key="reschedule" ch="Reschedule" sm icon="event_repeat" onClick={()=>setUiNotice(setState,'Appointment moved to the next available hospital slot.',C.sec)}/>,
+          <CTA key="checkin" ch="Start check-in" sm icon="how_to_reg" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,currentStep:Math.max(s.currentStep,3)}),{actor:'Patient App',text:'Patient started digital hospital check-in',tone:C.t})}/>
+        ]}>
+        <OcrIntakeCard state={state} setState={setState}/>
+      </PortalModulePage>
+    ),
+    consent: (
+      <PortalModulePage
+        eyebrow="Patient App"
+        title="Consent Center"
+        summary="Manage clinical-data sharing approvals, insurer disclosures, and patient-visible consent status for the cashless claim journey."
+        stats={[{l:'Primary consent',v:'Treatment approved',c:C.t},{l:'Claims consent',v:consentRecovered?'Active':'Needs action',c:consentRecovered?C.t:'#d97706'},{l:'Last update',v:'Today',c:C.sec}]}>
+        <ConsentRecoveryCard state={state} setState={setState}/>
+      </PortalModulePage>
+    ),
+    claims: (
+      <PortalModulePage
+        eyebrow="Patient App"
+        title="Claims"
+        summary="Follow the claim from intake to adjudication with the same status model used by the provider and insurer teams."
+        stats={[{l:'Claim status',v:state.claimStatus || 'Awaiting submission',c:C.p},{l:'Decision',v:state.claimDecision || 'Pending',c:C.sec},{l:'Hospital',v:state.selectedHospital?.name || 'Apollo Hospitals',c:C.t}]}
+        actions={[
+          <CTA key="refresh" ch="Refresh status" sm icon="sync" onClick={()=>setUiNotice(setState,'Claim status refreshed from MediCode and insurer systems.',C.p)}/>,
+          <CTA key="messages" ch="Open messages" sm icon="chat" onClick={()=>setView('messages')}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Claim activity"/>
+      </PortalModulePage>
+    ),
+    messages: (
+      <PortalModulePage
+        eyebrow="Patient App"
+        title="Messages"
+        summary="Hospital, coding, and insurer communications stay threaded here so the patient can respond to missing documents or consent requests."
+        stats={[{l:'Unread',v:'2',c:'#d97706'},{l:'Open requests',v:state.demoScenario==='missingDocs'?'1':'0',c:state.demoScenario==='missingDocs'?C.e:C.t},{l:'Last reply',v:'10 mins ago',c:C.sec}]}
+        actions={[
+          <CTA key="reply" ch="Send reply" sm icon="send" onClick={()=>setUiNotice(setState,'Patient reply sent to provider coordination team.',C.t)}/>,
+          <CTA key="upload" ch="Upload attachment" sm icon="attach_file" onClick={()=>setView('appointments')}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Conversation timeline"/>
+      </PortalModulePage>
+    ),
+  };
+  return (
+    <div style={{display:'flex',minHeight:'100vh'}}>
+      <Sidebar
+        items={patientNav}
+        active={view}
+        onNav={setView}
+        sub="Patient"
+        onNewEntry={()=>setUiNotice(setState,'New patient request draft opened.',C.p)}
+        onSignOut={()=>setUiNotice(setState,'Demo mode keeps the patient session active.',C.sec)}
+      />
+      <TopBar onNotifications={()=>setView('messages')}/>
+      <div style={{marginLeft:240,marginTop:96,flex:1,padding:32,background:C.s,minHeight:'calc(100vh - 96px)'}}>
+        <ActionBanner notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}/>
+        {patientViews[view]}
       </div>
     </div>
   );
@@ -821,19 +907,107 @@ function HospitalHIS({state,setState,advance}: any) {
   ];
 
   const activeNav = view==='treatment'?'workbench':view;
+  const hospitalPages:any = {
+    dashboard: (
+      <PortalModulePage
+        eyebrow="Hospital HIS"
+        title="Operations Dashboard"
+        summary="Monitor intake volume, pending pre-auth requests, and patient readiness before the claim package moves downstream."
+        stats={[{l:'Ready for review',v:'12',c:C.p},{l:'Waiting docs',v:state.demoScenario==='missingDocs'?'4':'1',c:state.demoScenario==='missingDocs'?C.e:'#d97706'},{l:'Cashless in progress',v:'9',c:C.t}]}
+        actions={[
+          <CTA key="openIntake" ch="Open intake queue" sm icon="move_to_inbox" onClick={()=>setView('intake')}/>,
+          <CTA key="workbench" ch="Open workbench" sm icon="smart_toy" onClick={()=>setView('workbench')}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Hospital activity"/>
+      </PortalModulePage>
+    ),
+    patients: (
+      <PortalModulePage
+        eyebrow="Hospital HIS"
+        title="Patients"
+        summary="Patient-specific view for demographics, appointment readiness, document status, and insurer-linked authorization details."
+        stats={[{l:'Active today',v:'34',c:C.p},{l:'Needs consent',v:state.demoScenario==='consentHold'?'1':'0',c:state.demoScenario==='consentHold'?'#d97706':C.t},{l:'Ready for TPA',v:'11',c:C.sec}]}
+        actions={[
+          <CTA key="ravi" ch="Open Ravi Kumar" sm icon="person_search" onClick={()=>setView('workbench')}/>,
+          <CTA key="consent" ch="Consent follow-up" sm icon="verified_user" onClick={()=>setUiNotice(setState,'Patient consent follow-up queued from hospital desk.',C.sec)}/>
+        ]}>
+        <OcrIntakeCard state={state} setState={setState}/>
+      </PortalModulePage>
+    ),
+    insurance: (
+      <PortalModulePage
+        eyebrow="Hospital HIS"
+        title="Insurance Desk"
+        summary="Validate payer mappings, policy eligibility, and TPA network status before sending clinical packets."
+        stats={[{l:'Eligible policies',v:'14',c:C.t},{l:'Policy mismatches',v:state.demoScenario==='policyMismatch'?'2':'0',c:state.demoScenario==='policyMismatch'?C.e:C.t},{l:'Avg response',v:'12s',c:C.p}]}
+        actions={[
+          <CTA key="policy" ch="Resolve mismatch" sm icon="policy" onClick={()=>setUiNotice(setState,'Policy exception routed to insurer review desk.',C.e)}/>,
+          <CTA key="sendPreauth" ch="Go to treatment review" sm icon="description" onClick={()=>setView('treatment')}/>
+        ]}>
+        <ExceptionActionsCard state={state} setState={setState}/>
+      </PortalModulePage>
+    ),
+    claims: (
+      <PortalModulePage
+        eyebrow="Hospital HIS"
+        title="Hospital Claims"
+        summary="Track pre-auth submissions, returned document requests, and synchronization back from MediCode and the insurer."
+        stats={[{l:'Submitted today',v:'9',c:C.p},{l:'Returned',v:state.demoScenario==='missingDocs'?'1':'0',c:state.demoScenario==='missingDocs'?'#d97706':C.t},{l:'Settled',v:'5',c:C.t}]}
+        actions={[
+          <CTA key="claimsOpen" ch="Open intake issue" sm icon="warning" onClick={()=>setView('intake')}/>,
+          <CTA key="timeline" ch="View timeline" sm icon="history" onClick={()=>setUiNotice(setState,'Hospital claim timeline refreshed.',C.p)}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Claim synchronization"/>
+      </PortalModulePage>
+    ),
+    analytics: (
+      <PortalModulePage
+        eyebrow="Hospital HIS"
+        title="Hospital Analytics"
+        summary="Operational reporting for claim readiness, authorization leakage, and document turnaround quality."
+        stats={[{l:'First-pass success',v:'91%',c:C.t},{l:'Packet completeness',v:state.demoScenario==='missingDocs'?'61%':'98%',c:state.demoScenario==='missingDocs'?C.e:C.t},{l:'Manual touches',v:'7',c:C.sec}]}
+        actions={[
+          <CTA key="logs" ch="Review engine logs" sm icon="monitoring" onClick={()=>setUiNotice(setState,'Verification engine logs opened for review.',C.sec)}/>
+        ]}>
+        <DataQualityCard scenario={state.demoScenario || 'healthy'}/>
+      </PortalModulePage>
+    ),
+    settings: (
+      <PortalModulePage
+        eyebrow="Hospital HIS"
+        title="Hospital Settings"
+        summary="Manage provider-side notification preferences, integration defaults, and demo routing behavior."
+        stats={[{l:'Integrations',v:'14',c:C.p},{l:'Consent policy',v:'Enabled',c:C.t},{l:'Default route',v:'Intake queue',c:C.sec}]}
+        actions={[
+          <CTA key="notif" ch="Test notification" sm icon="notifications_active" onClick={()=>setUiNotice(setState,'Hospital notification test sent successfully.',C.t)}/>,
+          <CTA key="reset" ch="Reset to overview" sm icon="restart_alt" onClick={()=>setView('dashboard')}/>
+        ]}
+      />
+    ),
+  };
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar items={nav} active={activeNav} onNav={v=>{setView(v);}} sub="Provider"/>
-      <TopBar/>
+      <Sidebar
+        items={nav}
+        active={activeNav}
+        onNav={v=>{setView(v);}}
+        sub="Provider"
+        onNewEntry={()=>setView('intake')}
+        onSignOut={()=>setUiNotice(setState,'Demo mode keeps the hospital session active.',C.sec)}
+      />
+      <TopBar onNotifications={()=>setView('claims')}/>
       <div style={{marginLeft:240,marginTop:96,flex:1,padding:32,background:C.s,minHeight:'calc(100vh - 96px)'}}>
+        <ActionBanner notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}/>
         {view==='intake'
           ? <IntakeQueue state={state} setState={setState} onOpen={()=>setView('workbench')}/>
           : view!=='treatment'
-          ? <BookingsDash bookings={BOOKINGS} confirmed={confirmed}
+          ? view==='workbench'
+            ? <BookingsDash bookings={BOOKINGS} confirmed={confirmed}
               onConfirm={id=>{setConfirmed(p=>({...p,[id]:true}));advance(4);applyStateUpdate(setState, (s:any)=>s, { actor:'Hospital HIS', text:`Confirmed appointment ${id} for hospital review`, tone:C.t });}}
               onReview={b=>{setSel(b);setView('treatment');}}
               state={state} setState={setState} advance={advance}/>
+            : hospitalPages[view]
           : <TreatmentRev booking={sel||BOOKINGS[0]} sent={sent}
               state={state} setState={setState}
               onSend={id=>{setSent(p=>({...p,[id]:true}));advance(5);applyStateUpdate(setState, (s:any)=>({...s,preAuthSent:true}), { actor:'Hospital HIS', text:`Sent pre-auth package ${id} to insurer/TPA`, tone:C.p });}}
@@ -845,6 +1019,7 @@ function HospitalHIS({state,setState,advance}: any) {
 }
 
 function BookingsDash({bookings,confirmed,onConfirm,onReview,state,setState}: any) {
+  const [filter,setFilter] = useState('All Bookings');
   return (
     <div>
       <div style={{marginBottom:32,display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
@@ -867,13 +1042,13 @@ function BookingsDash({bookings,confirmed,onConfirm,onReview,state,setState}: an
       <div style={{background:C.s0,borderRadius:16,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,0.04)'}}>
         <div style={{padding:'14px 24px',background:C.sL,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div style={{display:'flex',gap:8}}>
-            {['All Bookings','Pending TPA','Completed'].map((t,i)=>(
-              <button key={t} style={{padding:'6px 16px',borderRadius:8,background:i===0?C.s0:'transparent',
-                color:i===0?C.p:C.oSV,fontWeight:i===0?700:500,fontSize:13,border:'none',cursor:'pointer',
-                boxShadow:i===0?'0 1px 4px rgba(0,0,0,0.06)':'none'}}>{t}</button>
+            {['All Bookings','Pending TPA','Completed'].map(t=>(
+              <button key={t} onClick={()=>{setFilter(t);setUiNotice(setState,`Booking filter set to ${t}.`,C.p);}} style={{padding:'6px 16px',borderRadius:8,background:filter===t?C.s0:'transparent',
+                color:filter===t?C.p:C.oSV,fontWeight:filter===t?700:500,fontSize:13,border:'none',cursor:'pointer',
+                boxShadow:filter===t?'0 1px 4px rgba(0,0,0,0.06)':'none'}}>{t}</button>
             ))}
           </div>
-          <button style={{background:'transparent',border:'none',cursor:'pointer',color:C.oSV,display:'flex'}}>
+          <button onClick={()=>setUiNotice(setState,'Booking filter options opened.',C.sec)} style={{background:'transparent',border:'none',cursor:'pointer',color:C.oSV,display:'flex'}}>
             <Ic n="filter_list" s={20}/>
           </button>
         </div>
@@ -948,7 +1123,7 @@ function BookingsDash({bookings,confirmed,onConfirm,onReview,state,setState}: an
           <p style={{fontSize:11,fontWeight:500,color:C.out,textTransform:'uppercase',letterSpacing:'0.1em'}}>Showing 4 of 24 records</p>
           <div style={{display:'flex',gap:6}}>
             {['chevron_left','chevron_right'].map(ic=>(
-              <button key={ic} style={{padding:6,borderRadius:8,background:C.s0,
+              <button key={ic} onClick={()=>setUiNotice(setState,ic==='chevron_left'?'Moved to previous booking page.':'Moved to next booking page.',C.sec)} style={{padding:6,borderRadius:8,background:C.s0,
                 border:`1px solid ${C.oV}`,cursor:'pointer',color:C.out,display:'flex',alignItems:'center'}}>
                 <Ic n={ic} s={18}/>
               </button>
@@ -983,7 +1158,7 @@ function BookingsDash({bookings,confirmed,onConfirm,onReview,state,setState}: an
           <p style={{fontSize:12,color:'rgba(255,255,255,0.7)',marginTop:6,lineHeight:1.5}}>
             92% of external bookings are pre-validated by the Sanctuary Nexus Engine.
           </p>
-          <button style={{marginTop:16,fontSize:11,fontWeight:700,textTransform:'uppercase',
+          <button onClick={()=>setUiNotice(setState,'Integration verification logs opened from hospital analytics.',C.t)} style={{marginTop:16,fontSize:11,fontWeight:700,textTransform:'uppercase',
             letterSpacing:'0.1em',background:'transparent',border:'none',cursor:'pointer',
             color:'rgba(255,255,255,0.85)',display:'flex',alignItems:'center',gap:4}}>
             View Engine Logs <Ic n="arrow_forward" s={13} col="rgba(255,255,255,0.85)"/>
@@ -1160,12 +1335,8 @@ function TreatmentRev({booking,sent,state,setState,onSend,onBack}: any) {
 function MedicodePlatform({state,setState,advance}: any) {
   const [view,setView] = useState('dashboard');
   const [codeState,setCodeState] = useState({});
-  const [auxCodes,setAuxCodes] = useState<any[]>([]);
-  const [removedCodes,setRemovedCodes] = useState<string[]>([]);
   const [fraudDone,setFraudDone] = useState(false);
   const [fraudLoading,setFraudLoading] = useState(false);
-
-  const mergedCodes = [...CODES, ...auxCodes].filter((c) => !removedCodes.includes(c.code));
 
   const nav = [
     {id:'dashboard',ic:'dashboard',lbl:'Dashboard'},
@@ -1179,14 +1350,11 @@ function MedicodePlatform({state,setState,advance}: any) {
 
   const navActive = view==='coding'||view==='adjudication'?'workbench':view;
 
-  const handleCode = (code, action) => {
-    setCodeState((p) => {
-      const next = { ...p, [code]: action };
-      const pending = mergedCodes.filter((c) => !c.suggest);
-      const allDone = pending.every((c) => next[c.code] || c.code === code);
-      if (allDone) queueMicrotask(() => advance(8));
-      return next;
-    });
+  const handleCode = (code,action) => {
+    setCodeState(p=>({...p,[code]:action}));
+    const codes = CODES.filter(c=>!c.suggest);
+    const allDone = codes.every(c=>codeState[c.code]||c.code===code);
+    if(allDone) advance(8);
   };
 
   const runFraud = () => {
@@ -1194,28 +1362,95 @@ function MedicodePlatform({state,setState,advance}: any) {
     setTimeout(()=>{setFraudLoading(false);setFraudDone(true);advance(9);},1800);
   };
 
-  const allAccepted = mergedCodes.filter((c) => !c.suggest).every((c) => codeState[c.code] === "accepted");
+  const allAccepted = CODES.filter(c=>!c.suggest).every(c=>codeState[c.code]==='accepted');
+  const mediPages:any = {
+    patients: (
+      <PortalModulePage
+        eyebrow="MediCode Platform"
+        title="Patient Registry"
+        summary="A centralized patient view combining intake quality, coding readiness, consent status, and adjudication dependencies."
+        stats={[{l:'Active registry',v:'128',c:C.p},{l:'Needs coder review',v:state.demoScenario==='lowConfidence'?'6':'2',c:state.demoScenario==='lowConfidence'?C.e:'#d97706'},{l:'Clean sync',v:'94%',c:C.t}]}
+        actions={[
+          <CTA key="openCoding" ch="Open coding workbench" sm icon="smart_toy" onClick={()=>setView('coding')}/>,
+          <CTA key="patientMsg" ch="Message hospital" sm icon="mark_chat_read" onClick={()=>setUiNotice(setState,'Hospital coordination note sent from patient registry.',C.sec)}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Registry activity"/>
+      </PortalModulePage>
+    ),
+    insurance: (
+      <PortalModulePage
+        eyebrow="MediCode Platform"
+        title="Payer Rules"
+        summary="Review payer-specific coding edits, policy exceptions, and straight-through automation thresholds."
+        stats={[{l:'Active rulebooks',v:'24',c:C.p},{l:'Policy conflicts',v:state.demoScenario==='policyMismatch'?'3':'0',c:state.demoScenario==='policyMismatch'?C.e:C.t},{l:'Automation rate',v:'82%',c:C.t}]}
+        actions={[
+          <CTA key="override" ch="Create override case" sm icon="gavel" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,overrideCaseCreated:true}),{actor:'MediCode Rules',text:'Prepared insurer override package from payer rules page',tone:C.e})}/>,
+          <CTA key="review" ch="Open adjudication" sm icon="rate_review" onClick={()=>setView('adjudication')}/>
+        ]}>
+        <ExceptionActionsCard state={state} setState={setState}/>
+      </PortalModulePage>
+    ),
+    claims: (
+      <PortalModulePage
+        eyebrow="MediCode Platform"
+        title="Claims Worklist"
+        summary="Track claims by readiness, exception state, and submission channel as they move from coding to insurer delivery."
+        stats={[{l:'Queued',v:'18',c:C.p},{l:'Blocked',v:state.demoScenario==='missingDocs'||state.demoScenario==='consentHold'?'4':'1',c:(state.demoScenario==='missingDocs'||state.demoScenario==='consentHold')?'#d97706':C.sec},{l:'Sent today',v:'11',c:C.t}]}
+        actions={[
+          <CTA key="sendNow" ch="Go to send flow" sm icon="send" onClick={()=>setView('coding')}/>,
+          <CTA key="refreshClaims" ch="Refresh worklist" sm icon="sync" onClick={()=>setUiNotice(setState,'Claims worklist refreshed from coding and payer systems.',C.p)}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Claim operations"/>
+      </PortalModulePage>
+    ),
+    analytics: (
+      <PortalModulePage
+        eyebrow="MediCode Platform"
+        title="Analytics"
+        summary="Measure coding confidence, fraud precision, manual intervention, and handoff speed across the claim lifecycle."
+        stats={[{l:'Avg confidence',v:state.demoScenario==='lowConfidence'?'72%':'91%',c:state.demoScenario==='lowConfidence'?'#d97706':C.t},{l:'Fraud false positives',v:'2.1%',c:C.p},{l:'Turnaround',v:'2.4 days',c:C.sec}]}
+        actions={[
+          <CTA key="reviewUpdates" ch="Review updates" sm icon="analytics" onClick={()=>setUiNotice(setState,'Compliance and model update report opened.',C.sec)}/>
+        ]}>
+        <DataQualityCard scenario={state.demoScenario || 'healthy'}/>
+      </PortalModulePage>
+    ),
+    settings: (
+      <PortalModulePage
+        eyebrow="MediCode Platform"
+        title="Platform Settings"
+        summary="Control model routing, reviewer escalation defaults, and external system notifications for the demo environment."
+        stats={[{l:'Model version',v:'v4.2.1',c:C.p},{l:'Escalation rules',v:'Enabled',c:C.t},{l:'Alert channels',v:'3',c:C.sec}]}
+        actions={[
+          <CTA key="notify" ch="Test alert" sm icon="notifications_active" onClick={()=>setUiNotice(setState,'Platform alert test delivered to the review team.',C.t)}/>,
+          <CTA key="resetScenario" ch="Reset scenario" sm icon="restart_alt" onClick={()=>setState((s:any)=>({...s,demoScenario:'healthy'}))}/>
+        ]}
+      />
+    ),
+  };
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar items={nav} active={navActive} onNav={setView} sub="Provider"/>
-      <TopBar/>
+      <Sidebar
+        items={nav}
+        active={navActive}
+        onNav={setView}
+        sub="Provider"
+        onNewEntry={()=>setView('claims')}
+        onSignOut={()=>setUiNotice(setState,'Demo mode keeps the MediCode session active.',C.sec)}
+      />
+      <TopBar onNotifications={()=>setView('claims')}/>
       <div style={{marginLeft:240,marginTop:view==='coding'?96:96,flex:1,
         background:C.s,minHeight:'calc(100vh - 96px)',
         overflow:view==='coding'?'hidden':'auto'}}>
+        <ActionBanner notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}/>
         {view==='dashboard'&&<MediDash state={state} setState={setState} onWorkbench={()=>setView('coding')} onAdj={()=>setView('adjudication')}/>}
         {(view==='coding'||view==='workbench')&&
           <CodingWorkbench state={state} setState={setState} codeState={codeState} onCode={handleCode} fraudDone={fraudDone}
             fraudLoading={fraudLoading} onRunFraud={runFraud} allAccepted={allAccepted}
-            codesList={mergedCodes}
-            onAddCode={()=>setAuxCodes((ac:any[])=>[...ac,{
-              type:'ICD-10-CM', code:`Z9${Date.now().toString(36).slice(-4).toUpperCase()}`,
-              desc:'Additional coding line (demo). Use link icon to open an external code reference.',
-              conf:76, col:C.p,
-            }])}
-            onRemoveCode={(codeStr:string)=>setRemovedCodes((r)=>[...r, codeStr])}
             onPush={()=>{advance(10);setState(s=>({...s,claimStatus:'submitted'}));}}/>}
-        {view==='adjudication'&&<ClaimAdj state={state} advance={advance}/>}
+        {view==='adjudication'&&<ClaimAdj state={state} setState={setState} advance={advance}/>}
+        {mediPages[view] && mediPages[view]}
       </div>
     </div>
   );
@@ -1347,7 +1582,7 @@ function MediDash({state,setState,onWorkbench,onAdj}: any) {
             <p style={{fontSize:12,color:'rgba(255,255,255,0.75)',marginTop:6,lineHeight:1.5}}>
               Three new HIPAA-related updates require administrative attestation by Friday.
             </p>
-            <button style={{marginTop:14,fontSize:11,fontWeight:700,textTransform:'uppercase',
+            <button onClick={()=>setUiNotice(setState,'Compliance update report opened from analytics.',C.sec)} style={{marginTop:14,fontSize:11,fontWeight:700,textTransform:'uppercase',
               letterSpacing:'0.08em',background:'transparent',border:'none',
               borderBottom:'2px solid rgba(255,255,255,0.3)',cursor:'pointer',
               color:'rgba(255,255,255,0.9)',paddingBottom:3}}>Review Updates</button>
@@ -1358,22 +1593,7 @@ function MediDash({state,setState,onWorkbench,onAdj}: any) {
   );
 }
 
-function CodingWorkbench({
-  state,
-  setState,
-  codeState,
-  onCode,
-  fraudDone,
-  fraudLoading,
-  onRunFraud,
-  allAccepted,
-  onPush,
-  codesList = CODES,
-  onAddCode,
-  onRemoveCode,
-}: any) {
-  const [codeFilter, setCodeFilter] = useState("");
-  const [sortNewest, setSortNewest] = useState(true);
+function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading,onRunFraud,allAccepted,onPush}: any) {
   const scenario = state.demoScenario || 'healthy';
   const segs = [
     {t:'Patient presents with ',n:true},
@@ -1399,21 +1619,6 @@ function CodingWorkbench({
   const hMap = {blue:{bg:'#dbeafe',c:'#1e40af',b:'#3b82f6'},amber:{bg:'#fef3c7',c:'#92400e',b:'#f59e0b'},green:{bg:C.tF,c:C.t,b:C.t},gray:{bg:C.sX,c:C.oS,b:C.oV}};
   const scenarioMeta = SCENARIO_META[scenario];
   const canSubmit = fraudDone && allAccepted && scenario!=='missingDocs' && scenario!=='consentHold' && scenario!=='lowConfidence';
-  const q = codeFilter.trim().toLowerCase();
-  const filteredCodes = codesList.filter(
-    (c) => !q || c.code.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)
-  );
-  const sortedCodes = [...filteredCodes].sort((a, b) =>
-    sortNewest ? b.code.localeCompare(a.code) : a.code.localeCompare(b.code)
-  );
-  const copyCodeLine = (c: any) => {
-    const line = `${c.code}\t${c.desc}`;
-    if (navigator.clipboard?.writeText) void navigator.clipboard.writeText(line);
-  };
-  const openCodeReference = (c: any) => {
-    const u = `https://www.icd10data.com/search?s=${encodeURIComponent(c.code)}`;
-    window.open(u, "_blank", "noopener,noreferrer");
-  };
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 96px)'}}>
@@ -1471,67 +1676,27 @@ function CodingWorkbench({
           </div>
         </section>
 
-        {/* Coding Panel — layout aligned with medical coding portals (codes list + icon actions) */}
-        <section style={{width:420,background:C.sL,display:'flex',flexDirection:'column',flexShrink:0}}>
-          <div style={{padding:'16px 18px',borderBottom:`1px solid ${C.oV}20`,
-            background:'rgba(255,255,255,0.72)',backdropFilter:'blur(12px)',
+        {/* Coding Panel */}
+        <section style={{width:400,background:C.sL,display:'flex',flexDirection:'column',flexShrink:0}}>
+          <div style={{padding:'18px 22px',borderBottom:`1px solid ${C.oV}20`,
+            background:'rgba(255,255,255,0.65)',backdropFilter:'blur(12px)',
             WebkitBackdropFilter:'blur(12px)',position:'sticky',top:0,zIndex:10}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <h3 style={{fontWeight:800,fontSize:17,color:C.oS,margin:0,letterSpacing:'-0.02em'}}>Codes</h3>
-                <Bdg ch="AI Assisted" bg="rgba(0,72,141,0.1)" col={C.p} s={9}/>
-              </div>
-              {onAddCode && (
-                <button type="button" onClick={onAddCode} style={{
-                  background:C.pC,color:'#fff',fontWeight:700,fontSize:12,padding:'8px 16px',borderRadius:8,
-                  border:'none',cursor:'pointer',boxShadow:'0 2px 8px rgba(0,95,184,0.35)',display:'inline-flex',alignItems:'center',gap:6,
-                }}>
-                  <Ic n="add" s={16} col="#fff"/>Add
-                </button>
-              )}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+              <h3 style={{fontWeight:700,fontSize:16,color:C.p}}>Auto-Coding View</h3>
+              <Bdg ch="AI Assisted" bg={`rgba(0,72,141,0.1)`} col={C.p}/>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <Ic n="filter_list" s={16} col={C.out}/>
-              <input
-                value={codeFilter}
-                onChange={(e)=>setCodeFilter(e.target.value)}
-                placeholder="Filter codes…"
-                style={{
-                  flex:1,fontSize:12,padding:'8px 10px',borderRadius:8,border:`1px solid ${C.oV}55`,
-                  background:C.s0,outline:'none',color:C.oS,
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={()=>setSortNewest((v)=>!v)}
-              style={{
-                width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
-                padding:'8px 10px',borderRadius:8,border:`1px solid ${C.oV}40`,background:C.s0,
-                cursor:'pointer',fontSize:11,fontWeight:600,color:C.oSV,
-              }}
-            >
-              <span style={{display:'flex',alignItems:'center',gap:6}}>
-                <Ic n="sort" s={16} col={C.p}/>
-                Sort: {sortNewest ? "newest → oldest" : "oldest → newest"}
-              </span>
-              <Ic n="expand_more" s={18} col={C.out}/>
-            </button>
-            <p style={{fontSize:10,color:C.out,margin:'10px 0 0',fontStyle:'italic'}}>
-              {sortedCodes.length} of {codesList.length} codes · narrative-generated
-            </p>
+            <p style={{fontSize:11,color:C.out,fontStyle:'italic'}}>Generated {CODES.length} codes from narrative analysis.</p>
           </div>
           <div style={{flex:1,overflowY:'auto',padding:14,display:'flex',flexDirection:'column',gap:12}}>
-            {sortedCodes.map((code)=>(
-              <div key={code.code} style={{background:C.s0,borderRadius:14,padding:14,
-                boxShadow:'0 2px 8px rgba(0,0,0,0.05)',
-                border:`1px solid ${C.oV}35`,
+            {CODES.map(code=>(
+              <div key={code.code} style={{background:C.s0,borderRadius:14,padding:16,
+                boxShadow:'0 2px 8px rgba(0,0,0,0.04)',
                 borderLeft:`4px solid ${codeState[code.code]==='accepted'?C.t:code.suggest?C.p:code.col}`,
                 transition:'border-color 0.2s'}}>
                 {code.suggest?(
                   <div style={{display:'flex',gap:10}}>
                     <Ic n="lightbulb" f={1} s={18} col={C.p}/>
-                    <div style={{flex:1}}>
+                    <div>
                       <p style={{fontSize:9,fontWeight:700,color:C.p,textTransform:'uppercase',marginBottom:4}}>AI Suggestion</p>
                       <p style={{fontSize:12,color:C.oSV,lineHeight:1.5}}>{code.desc}</p>
                       <button onClick={()=>onCode(code.code,'accepted')}
@@ -1541,47 +1706,24 @@ function CodingWorkbench({
                   </div>
                 ):(
                   <>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:6}}>
-                      <div style={{minWidth:0}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                      <div>
                         <span style={{fontSize:9,fontWeight:700,color:C.out,textTransform:'uppercase',
                           letterSpacing:'0.1em',display:'block',marginBottom:3}}>{code.type}</span>
-                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                          <span style={{fontSize:20,fontWeight:900,color:C.oS,letterSpacing:'-0.02em'}}>{code.code}</span>
-                          {codeState[code.code] !== "accepted" && (
-                            <Bdg ch="Predicted" bg="#e0f2fe" col={C.pC} s={9}/>
-                          )}
-                          {codeState[code.code] === "accepted" && (
-                            <Bdg ch="Confirmed" bg={C.tF} col={C.t} s={9}/>
-                          )}
-                          {codeState[code.code] === "edited" && (
-                            <Bdg ch="Edited" bg={C.sFx} col={C.sec} s={9}/>
-                          )}
-                        </div>
+                        <span style={{fontSize:22,fontWeight:900,color:C.oS,letterSpacing:'-0.02em'}}>{code.code}</span>
                       </div>
-                      <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-                        <CodeIconBtn icon="content_copy" title="Copy code" onClick={()=>copyCodeLine(code)} />
-                        <CodeIconBtn icon="edit" title="Mark edited" onClick={()=>onCode(code.code,"edited")} />
-                        <CodeIconBtn icon="open_in_new" title="Open reference" onClick={()=>openCodeReference(code)} />
-                        {onRemoveCode && (
-                          <CodeIconBtn icon="close" title="Remove from list" danger onClick={()=>onRemoveCode(code.code)} />
-                        )}
-                      </div>
-                    </div>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:10,marginBottom:8}}>
-                      <p style={{fontSize:12,color:C.oSV,lineHeight:1.45,margin:0,flex:1}}>{code.desc}</p>
-                      <div style={{textAlign:'right',flexShrink:0}}>
-                        <span style={{fontSize:10,fontWeight:700,
-                          color:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=90?C.t:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=75?'#d97706':C.e}}>
-                          {scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf}%
-                        </span>
-                        <div style={{width:64,height:4,background:C.sX,borderRadius:2,overflow:'hidden',marginTop:4}}>
+                      <div style={{textAlign:'right'}}>
+                        <span style={{fontSize:11,fontWeight:700,
+                          color:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=90?C.t:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=75?'#d97706':C.e}}>{scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf}% Confidence</span>
+                        <div style={{width:72,height:4,background:C.sX,borderRadius:2,overflow:'hidden',marginTop:4}}>
                           <div style={{height:'100%',width:`${scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf}%`,borderRadius:2,
                             background:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=90?C.t:(scenario==='lowConfidence'?Math.max(code.conf-18,62):code.conf)>=75?'#d97706':C.e}}/>
                         </div>
                       </div>
                     </div>
+                    <p style={{fontSize:12,color:C.oSV,lineHeight:1.4,marginBottom:12}}>{code.desc}</p>
                     <div style={{display:'flex',gap:8}}>
-                      <button type="button" onClick={()=>onCode(code.code,'accepted')} style={{flex:1,padding:'8px 0',
+                      <button onClick={()=>onCode(code.code,'accepted')} style={{flex:1,padding:'7px 0',
                         background:codeState[code.code]==='accepted'?C.tF:`rgba(0,84,40,0.08)`,
                         color:C.t,fontWeight:700,fontSize:11,borderRadius:8,
                         border:codeState[code.code]==='accepted'?`1px solid ${C.t}40`:'none',cursor:'pointer',
@@ -1589,7 +1731,7 @@ function CodingWorkbench({
                         {codeState[code.code]==='accepted'&&<Ic n="check" s={11} col={C.t}/>}
                         {codeState[code.code]==='accepted'?'Accepted':'Accept'}
                       </button>
-                      <button type="button" onClick={()=>onCode(code.code,'edited')} style={{flex:1,padding:'8px 0',
+                      <button onClick={()=>onCode(code.code,'edited')} style={{flex:1,padding:'7px 0',
                         background:C.sM,color:C.oSV,fontWeight:700,fontSize:11,borderRadius:8,border:'none',cursor:'pointer'}}>
                         Edit
                       </button>
@@ -1646,7 +1788,7 @@ function CodingWorkbench({
               {fraudLoading?'⏳ Running checks...':'Run Fraud Check'}
             </button>
           )}
-          <button style={{padding:'10px 18px',borderRadius:8,background:C.sM,color:C.oSV,
+          <button onClick={()=>setUiNotice(setState,'Coding workbench draft saved successfully.',C.t)} style={{padding:'10px 18px',borderRadius:8,background:C.sM,color:C.oSV,
             fontWeight:700,fontSize:13,border:'none',cursor:'pointer'}}>Save Draft</button>
           <CTA ch="Approve & Send" onClick={onPush} disabled={!canSubmit} icon="send"/>
         </div>
@@ -1655,7 +1797,7 @@ function CodingWorkbench({
   );
 }
 
-function ClaimAdj({state,advance}: any) {
+function ClaimAdj({state,setState,advance}: any) {
   const scenario = state.demoScenario || 'healthy';
   const [decided,setDecided] = useState(false);
   return (
@@ -1687,7 +1829,7 @@ function ClaimAdj({state,advance}: any) {
           <div style={{background:C.s0,borderRadius:16,padding:24,boxShadow:'0 2px 12px rgba(0,0,0,0.04)'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:18,alignItems:'center'}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}><Ic n="medical_information" s={18} col={C.sec}/><SL ch="Clinical Narrative"/></div>
-              <button style={{color:C.p,fontSize:11,fontWeight:600,background:'transparent',border:'none',cursor:'pointer'}}>View Document</button>
+              <button onClick={()=>setUiNotice(setState,'Clinical source document opened for adjudication review.',C.p)} style={{color:C.p,fontSize:11,fontWeight:600,background:'transparent',border:'none',cursor:'pointer'}}>View Document</button>
             </div>
             <div style={{background:'rgba(242,244,245,0.6)',borderRadius:10,padding:14,marginBottom:12,
               fontStyle:'italic',color:C.oSV,lineHeight:1.7,fontSize:12}}>
@@ -1798,9 +1940,9 @@ function ClaimAdj({state,advance}: any) {
             </p>
           </div>
           <div style={{display:'flex',gap:10}}>
-            <button style={{padding:'10px 18px',fontSize:13,fontWeight:700,color:C.sec,background:'transparent',border:'none',cursor:'pointer',borderRadius:8}}>Query/Hold</button>
-            <button style={{padding:'10px 18px',fontSize:13,fontWeight:700,color:C.e,border:`2px solid rgba(186,26,26,0.15)`,background:'transparent',cursor:'pointer',borderRadius:8}}>Reject Claim</button>
-            <CTA ch="Approve Claim" onClick={()=>{setDecided(true);advance(11);}} icon="check"/>
+            <button onClick={()=>{setDecided(true);applyStateUpdate(setState,(s:any)=>({...s,claimStatus:'queried'}),{actor:'MediCode Review',text:'Claim placed on query/hold for additional adjudication evidence',tone:C.sec});}} style={{padding:'10px 18px',fontSize:13,fontWeight:700,color:C.sec,background:'transparent',border:'none',cursor:'pointer',borderRadius:8}}>Query/Hold</button>
+            <button onClick={()=>{setDecided(true);applyStateUpdate(setState,(s:any)=>({...s,claimStatus:'rejected'}),{actor:'MediCode Review',text:'Claim rejected during internal adjudication review',tone:C.e});}} style={{padding:'10px 18px',fontSize:13,fontWeight:700,color:C.e,border:`2px solid rgba(186,26,26,0.15)`,background:'transparent',cursor:'pointer',borderRadius:8}}>Reject Claim</button>
+            <CTA ch="Approve Claim" onClick={()=>{setDecided(true);advance(11);applyStateUpdate(setState,(s:any)=>({...s,claimStatus:'ready-for-insurer'}),{actor:'MediCode Review',text:'Internal adjudication approved and routed to insurer review',tone:C.t});}} icon="check"/>
           </div>
         </div>
       </div>
@@ -1826,18 +1968,84 @@ function InsurerPortal({state,setState,advance}: any) {
 
   const decide = d => {
     setDecision(d);
-    setState(s=>({...s,claimDecision:d}));
+    applyStateUpdate(setState, (s:any)=>({...s,claimDecision:d,claimStatus:d==='approved'?'approved':d==='rejected'?'rejected':'query-raised'}), {
+      actor:'Insurer Review',
+      text:d==='approved'?'Insurer approved claim and initiated payment.':d==='rejected'?'Insurer rejected claim after review.':'Insurer raised a query for additional documents.',
+      tone:d==='approved'?C.t:d==='rejected'?C.e:C.sec,
+    });
     advance(12);
     setTimeout(()=>advance(13),600);
+  };
+  const insurerPages:any = {
+    dashboard: (
+      <PortalModulePage
+        eyebrow="Insurer Portal"
+        title="Claims Command Center"
+        summary="High-level claims operations view for pending approvals, escalations, exception load, and service levels across the insurer queue."
+        stats={[{l:'Pending review',v:'12',c:'#d97706'},{l:'Overrides',v:state.overrideCaseCreated?'1':'0',c:state.overrideCaseCreated?C.e:C.t},{l:'Approved today',v:'34',c:C.t}]}
+        actions={[
+          <CTA key="openQueue" ch="Open claims queue" sm icon="receipt_long" onClick={()=>setView('claims')}/>,
+          <CTA key="compliance" ch="Open compliance" sm icon="policy" onClick={()=>setView('compliance')}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Insurer activity"/>
+      </PortalModulePage>
+    ),
+    compliance: (
+      <PortalModulePage
+        eyebrow="Insurer Portal"
+        title="Compliance Review"
+        summary="Inspect audit evidence, consent status, policy rule exceptions, and reviewer overrides before claim decisions are finalized."
+        stats={[{l:'Items needing audit',v:state.demoScenario==='consentHold'||state.demoScenario==='policyMismatch'?'3':'1',c:state.demoScenario==='consentHold'||state.demoScenario==='policyMismatch'?'#d97706':C.sec},{l:'Consent exceptions',v:state.demoScenario==='consentHold'?'1':'0',c:state.demoScenario==='consentHold'?'#d97706':C.t},{l:'Override packets',v:state.overrideCaseCreated?'1':'0',c:state.overrideCaseCreated?C.e:C.t}]}
+        actions={[
+          <CTA key="reviewClaim" ch="Open review detail" sm icon="rate_review" onClick={()=>setView('detail')}/>,
+          <CTA key="export" ch="Export audit packet" sm icon="download" onClick={()=>setUiNotice(setState,'Audit packet prepared for export.',C.t)}/>
+        ]}>
+        <ComplianceAuditSidebar scenario={state.demoScenario || 'healthy'} activities={state.activities}/>
+      </PortalModulePage>
+    ),
+    analytics: (
+      <PortalModulePage
+        eyebrow="Insurer Portal"
+        title="Adjudication Analytics"
+        summary="Track approval velocity, exception frequency, and reviewer workload across cashless and reimbursement claims."
+        stats={[{l:'Median decision time',v:'4m',c:C.p},{l:'Manual reviews',v:'18%',c:C.sec},{l:'Query rate',v:'6%',c:'#d97706'}]}
+        actions={[
+          <CTA key="refreshAnalytics" ch="Refresh analytics" sm icon="insights" onClick={()=>setUiNotice(setState,'Adjudication analytics refreshed.',C.p)}/>
+        ]}>
+        <ActivityTimeline items={state.activities} title="Decision analytics"/>
+      </PortalModulePage>
+    ),
+    settings: (
+      <PortalModulePage
+        eyebrow="Insurer Portal"
+        title="Reviewer Settings"
+        summary="Manage review queues, escalation defaults, and communications generated from the insurer portal."
+        stats={[{l:'Active reviewers',v:'8',c:C.p},{l:'Escalation SLA',v:'30m',c:C.t},{l:'Policy feeds',v:'6',c:C.sec}]}
+        actions={[
+          <CTA key="testQueue" ch="Test queue alert" sm icon="notifications_active" onClick={()=>setUiNotice(setState,'Reviewer queue alert sent successfully.',C.t)}/>,
+          <CTA key="returnClaims" ch="Back to queue" sm icon="arrow_back" onClick={()=>setView('claims')}/>
+        ]}
+      />
+    ),
   };
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar items={nav} active={view==='detail'?'claims':view} onNav={setView} sub="Insurer"/>
-      <TopBar/>
+      <Sidebar
+        items={nav}
+        active={view==='detail'?'claims':view}
+        onNav={setView}
+        sub="Insurer"
+        onNewEntry={()=>setView('claims')}
+        onSignOut={()=>setUiNotice(setState,'Demo mode keeps the insurer session active.',C.sec)}
+      />
+      <TopBar onNotifications={()=>setView('compliance')}/>
       <div style={{marginLeft:240,marginTop:96,flex:1,padding:32,background:C.s,minHeight:'calc(100vh - 96px)'}}>
+        <ActionBanner notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}/>
         {view!=='detail'
-          ? <InsurerQueue onReview={()=>setView('detail')} state={state}/>
+          ? view==='claims'
+            ? <InsurerQueue onReview={()=>setView('detail')} state={state} setState={setState}/>
+            : insurerPages[view]
           : <InsurerDetail decision={decision} onDecide={decide} notes={notes} setNotes={setNotes} state={state} setState={setState} onBack={()=>setView('claims')}/>
         }
       </div>
@@ -1845,7 +2053,8 @@ function InsurerPortal({state,setState,advance}: any) {
   );
 }
 
-function InsurerQueue({onReview,state}: any) {
+function InsurerQueue({onReview,state,setState}: any) {
+  const [filter,setFilter] = useState('All Claims');
   const rows = [
     {id:'CLM-2024-001',pat:state.name||'Ravi Kumar',policy:state.policy||'POL-2024-004521',hosp:state.selectedHospital?.name||'Apollo Hospitals',amt:`₹${state.estCost||'12,500'}`,date:'Apr 22, 2024',st:'Pending Review',sb:'#fef3c7',sc:'#92400e'},
     {id:'CLM-2024-002',pat:'Priya Sharma',policy:'NHIC-2024-009',hosp:'Yashoda Super Speciality',amt:'₹45,200',date:'Apr 21, 2024',st:'Under Review',sb:C.sFx,sc:C.sec},
@@ -1873,10 +2082,10 @@ function InsurerQueue({onReview,state}: any) {
 
       <div style={{background:C.s0,borderRadius:16,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,0.04)'}}>
         <div style={{padding:'14px 24px',background:C.sL,display:'flex',gap:8}}>
-          {['All Claims','Pending Review','Approved','Rejected'].map((t,i)=>(
-            <button key={t} style={{padding:'6px 16px',borderRadius:8,background:i===0?C.s0:'transparent',
-              color:i===0?C.p:C.oSV,fontWeight:i===0?700:500,fontSize:12,border:'none',cursor:'pointer',
-              boxShadow:i===0?'0 1px 4px rgba(0,0,0,0.06)':'none'}}>{t}</button>
+          {['All Claims','Pending Review','Approved','Rejected'].map(t=>(
+            <button key={t} onClick={()=>{setFilter(t);setUiNotice(setState,`Insurer queue filter set to ${t}.`,C.p);}} style={{padding:'6px 16px',borderRadius:8,background:filter===t?C.s0:'transparent',
+              color:filter===t?C.p:C.oSV,fontWeight:filter===t?700:500,fontSize:12,border:'none',cursor:'pointer',
+              boxShadow:filter===t?'0 1px 4px rgba(0,0,0,0.06)':'none'}}>{t}</button>
           ))}
         </div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -1901,7 +2110,7 @@ function InsurerQueue({onReview,state}: any) {
                 <td style={{padding:'16px 18px'}}><span style={{fontSize:12,color:C.oSV}}>{r.date}</span></td>
                 <td style={{padding:'16px 18px'}}><Bdg ch={r.st} bg={r.sb} col={r.sc}/></td>
                 <td style={{padding:'16px 18px',textAlign:'right'}}>
-                  <button onClick={onReview} style={{background:VG,color:'#fff',fontWeight:700,
+                  <button onClick={()=>{setUiNotice(setState,`Opened claim ${r.id} for insurer review.`,C.t);onReview();}} style={{background:VG,color:'#fff',fontWeight:700,
                     fontSize:11,padding:'7px 14px',borderRadius:8,border:'none',cursor:'pointer',
                     boxShadow:'0 2px 8px rgba(0,72,141,0.2)'}}>Review Claim</button>
                 </td>
@@ -1913,7 +2122,7 @@ function InsurerQueue({onReview,state}: any) {
           <p style={{fontSize:10,fontWeight:500,color:C.out,textTransform:'uppercase',letterSpacing:'0.1em'}}>Showing 4 of 847 records</p>
           <div style={{display:'flex',gap:6}}>
             {['chevron_left','chevron_right'].map(ic=>(
-              <button key={ic} style={{padding:6,borderRadius:8,background:C.s0,border:`1px solid ${C.oV}`,cursor:'pointer',color:C.out,display:'flex'}}>
+              <button key={ic} onClick={()=>setUiNotice(setState,ic==='chevron_left'?'Moved to previous claims page.':'Moved to next claims page.',C.sec)} style={{padding:6,borderRadius:8,background:C.s0,border:`1px solid ${C.oV}`,cursor:'pointer',color:C.out,display:'flex'}}>
                 <Ic n={ic} s={18}/>
               </button>
             ))}
