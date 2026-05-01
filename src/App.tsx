@@ -546,132 +546,498 @@ function PortalModulePage({eyebrow,title,summary,stats,actions,children}: any) {
   );
 }
 
-function PatientApp({state,setState,advance}: any) {
-  const consentRecovered = !!state.consentRecovered;
-  const [view,setView] = useState('overview');
-  const patientNav = [
-    {id:'overview',ic:'space_dashboard',lbl:'Overview'},
-    {id:'appointments',ic:'event_available',lbl:'Appointments'},
-    {id:'consent',ic:'verified_user',lbl:'Consent Center'},
-    {id:'claims',ic:'receipt_long',lbl:'Claims'},
-    {id:'messages',ic:'chat',lbl:'Messages'},
+function PatientTopNav({view,setView}: any) {
+  const nav = [
+    {id:'dashboard',lbl:'Dashboard'},
+    {id:'providers',lbl:'Find Provider'},
+    {id:'claims',lbl:'Claims'},
+    {id:'benefits',lbl:'Benefits'},
+    {id:'profile',lbl:'Profile'},
   ];
-  const patientViews:any = {
-    overview: (
-      <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr',gap:22,alignItems:'start'}}>
-        <div style={{display:'flex',flexDirection:'column',gap:20}}>
-          <div style={{background:C.s0,borderRadius:20,padding:26,boxShadow:'0 4px 18px rgba(0,0,0,0.05)'}}>
-            <SL ch="Patient App"/>
-            <h1 style={{fontSize:34,fontWeight:900,color:C.oS,letterSpacing:'-0.02em',marginTop:4}}>Member Claim Companion</h1>
-            <p style={{fontSize:14,color:C.oSV,lineHeight:1.65,marginTop:8,maxWidth:620}}>
-              A dedicated patient-facing view for appointments, consent recovery, status tracking, and communications before the hospital begins claim review.
-            </p>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginTop:18}}>
-              {[
-                {l:'Current claim',v:state.claimStatus || 'Pre-auth pending',c:C.p},
-                {l:'Consent status',v:consentRecovered?'Active':'Needs action',c:consentRecovered?C.t:'#d97706'},
-                {l:'Hospital booking',v:'Apollo Hospitals',c:C.sec},
-              ].map(card=>(
-                <div key={card.l} style={{background:C.sL,borderRadius:14,padding:16}}>
-                  <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>{card.l}</p>
-                  <p style={{fontSize:20,fontWeight:900,color:card.c,marginTop:4}}>{card.v}</p>
+  return (
+    <div style={{position:'sticky',top:44,zIndex:25,background:'rgba(255,255,255,0.88)',backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',boxShadow:'0 1px 0 rgba(194,198,212,0.28)'}}>
+      <div style={{maxWidth:1320,margin:'0 auto',padding:'16px 28px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:32}}>
+          <div style={{fontSize:18,fontWeight:900,color:'#1240b5',letterSpacing:'-0.03em'}}>Sanctuary Health</div>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            {nav.map((item:any)=>(
+              <button key={item.id} onClick={()=>setView(item.id)} style={{background:'transparent',border:'none',cursor:'pointer',padding:'8px 6px',fontSize:13,fontWeight:view===item.id?800:600,color:view===item.id?'#1240b5':C.oSV}}>
+                {item.lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(242,244,245,0.9)',borderRadius:12,padding:'10px 14px',minWidth:280}}>
+            <Ic n="search" s={16} col={C.out}/>
+            <span style={{fontSize:12,color:C.out}}>Search resources...</span>
+          </div>
+          <button style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',color:C.oSV}}><Ic n="notifications" s={20}/></button>
+          <button style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',color:C.oSV}}><Ic n="account_circle" s={24}/></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PatientShell({children,notice,onDismiss}: any) {
+  return (
+    <div style={{background:'#eff3f7',minHeight:'calc(100vh - 44px)'}}>
+      <div style={{maxWidth:1320,margin:'0 auto',padding:'28px'}}>
+        <ActionBanner notice={notice} onDismiss={onDismiss}/>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PatientField({label,placeholder,value,onChange,icon,type='text'}: any) {
+  return (
+    <label style={{display:'flex',flexDirection:'column',gap:8}}>
+      <span style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.18em',color:'#4f596b'}}>{label}</span>
+      <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(230,232,233,0.7)',borderRadius:12,padding:'0 14px',minHeight:60}}>
+        <input
+          type={type}
+          value={value || ''}
+          onChange={onChange}
+          placeholder={placeholder}
+          style={{flex:1,border:'none',background:'transparent',outline:'none',fontSize:14,color:C.oS}}
+        />
+        {icon ? <Ic n={icon} s={18} col={C.oSV}/> : null}
+      </div>
+    </label>
+  );
+}
+
+function PatientProfileScreen({state,setState,advance,setView}: any) {
+  const completion = state.profileSaved ? 92 : 35;
+  return (
+    <PatientShell notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}>
+      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1.7fr) 360px',gap:38,alignItems:'start'}}>
+        <div>
+          <h1 style={{fontSize:58,fontWeight:900,color:C.oS,letterSpacing:'-0.04em',lineHeight:0.96,margin:'10px 0 12px'}}>Create Patient Profile</h1>
+          <p style={{fontSize:18,color:'#31394a',lineHeight:1.6,maxWidth:720,marginBottom:34}}>Enter your personal and insurance details to begin your journey with Sanctuary Health.</p>
+
+          <div style={{display:'flex',flexDirection:'column',gap:30}}>
+            <div style={{background:'rgba(255,255,255,0.84)',borderRadius:18,padding:40,boxShadow:'0 16px 50px rgba(30,58,95,0.06)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:28}}>
+                <div style={{width:52,height:52,borderRadius:14,background:'rgba(214,227,255,0.95)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <Ic n="badge" f={1} s={22} col={C.p}/>
                 </div>
-              ))}
+                <div style={{fontSize:24,fontWeight:900,color:C.oS}}>Personal Information</div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:22}}>
+                <PatientField label="Full Name" placeholder="e.g. Rahul Sharma" value={state.name} onChange={(e:any)=>setState((s:any)=>({...s,name:e.target.value}))}/>
+                <PatientField label="Date Of Birth" placeholder="dd/mm/yyyy" value={state.dob} onChange={(e:any)=>setState((s:any)=>({...s,dob:e.target.value}))} icon="calendar_today"/>
+                <PatientField label="Gender" placeholder="Select Gender" value={state.gender || ''} onChange={(e:any)=>setState((s:any)=>({...s,gender:e.target.value}))} icon="expand_more"/>
+                <PatientField label="Aadhaar ID" placeholder="0000 0000 0000" value={state.aadhaar || ''} onChange={(e:any)=>setState((s:any)=>({...s,aadhaar:e.target.value}))}/>
+              </div>
+            </div>
+
+            <div style={{background:'rgba(255,255,255,0.84)',borderRadius:18,padding:40,boxShadow:'0 16px 50px rgba(30,58,95,0.06)'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:18,marginBottom:28}}>
+                <div style={{display:'flex',alignItems:'center',gap:14}}>
+                  <div style={{width:52,height:52,borderRadius:14,background:'rgba(141,249,169,0.82)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <Ic n="shield" f={1} s={22} col={C.t}/>
+                  </div>
+                  <div style={{fontSize:24,fontWeight:900,color:C.oS}}>Insurance Details</div>
+                </div>
+                <button onClick={()=>setUiNotice(setState,'Policy scan simulated and insurer fields pre-filled.',C.t)} style={{padding:'14px 18px',borderRadius:12,background:'rgba(230,232,233,0.8)',border:'none',cursor:'pointer',fontSize:14,fontWeight:800,color:C.p,display:'flex',alignItems:'center',gap:8}}>
+                  <Ic n="credit_card" s={18} col={C.p}/>Scan Policy Card
+                </button>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:22}}>
+                <PatientField label="Insurer Name" placeholder="e.g. Star Health" value={state.insurer} onChange={(e:any)=>setState((s:any)=>({...s,insurer:e.target.value}))}/>
+                <PatientField label="Policy Number" placeholder="POL-987654321" value={state.policy} onChange={(e:any)=>setState((s:any)=>({...s,policy:e.target.value}))}/>
+                <PatientField label="TPA (Third Party Administrator)" placeholder="e.g. MediAssist" value={state.tpa || ''} onChange={(e:any)=>setState((s:any)=>({...s,tpa:e.target.value}))}/>
+                <PatientField label="Coverage Type" placeholder="Comprehensive Care" value={state.coverageType || ''} onChange={(e:any)=>setState((s:any)=>({...s,coverageType:e.target.value}))} icon="expand_more"/>
+                <PatientField label="Valid From" placeholder="dd/mm/yyyy" value={state.policyStart || ''} onChange={(e:any)=>setState((s:any)=>({...s,policyStart:e.target.value}))} icon="calendar_today"/>
+                <PatientField label="Valid Until" placeholder="dd/mm/yyyy" value={state.validity} onChange={(e:any)=>setState((s:any)=>({...s,validity:e.target.value}))} icon="calendar_today"/>
+              </div>
+            </div>
+
+            <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:20,padding:'0 4px 12px'}}>
+              <button onClick={()=>setUiNotice(setState,'Profile edits reset to the current demo values.',C.sec)} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:18,fontWeight:700,color:'#5a6477'}}>Cancel</button>
+              <button onClick={()=>{
+                applyStateUpdate(setState,(s:any)=>({...s,profileSaved:true,currentStep:Math.max(s.currentStep,2)}),{actor:'Patient App',text:'Patient profile and insurance details saved',tone:C.t});
+                advance(2);
+                setView('dashboard');
+              }} style={{padding:'18px 28px',borderRadius:12,background:VG,color:'#fff',border:'none',cursor:'pointer',fontSize:16,fontWeight:900,boxShadow:'0 18px 40px rgba(0,72,141,0.24)',display:'flex',alignItems:'center',gap:10}}>
+                <Ic n="save" s={18} col="#fff"/>Save Profile
+              </button>
             </div>
           </div>
-          <div style={{background:C.s0,borderRadius:20,padding:24,boxShadow:'0 4px 18px rgba(0,0,0,0.05)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <div>
-                <SL ch="Patient Timeline"/>
-                <h3 style={{fontSize:18,fontWeight:800,color:C.oS,marginTop:4}}>Claim & appointment milestones</h3>
-              </div>
-              <Bdg ch={`Step ${state.currentStep}/13`} bg={C.pFx} col={C.p}/>
+        </div>
+
+        <div style={{display:'flex',flexDirection:'column',gap:22,marginTop:94}}>
+          <div style={{background:VG,borderRadius:18,padding:'28px 30px',color:'#fff',position:'relative',overflow:'hidden',boxShadow:'0 22px 44px rgba(0,72,141,0.22)'}}>
+            <div style={{fontSize:20,fontWeight:900,marginBottom:12}}>Why Sanctuary?</div>
+            <p style={{fontSize:14,lineHeight:1.65,color:'rgba(255,255,255,0.8)',maxWidth:250}}>Your data is stored in an encrypted vault, accessible only to licensed clinical providers within our network.</p>
+            <div style={{display:'flex',flexDirection:'column',gap:16,marginTop:26}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,fontSize:13,fontWeight:700}}><Ic n="verified_user" s={18} col="#d6e3ff"/>HIPAA & GDPR Compliant</div>
+              <div style={{display:'flex',alignItems:'center',gap:10,fontSize:13,fontWeight:700}}><Ic n="sync_alt" s={18} col="#d6e3ff"/>Instant Insurance Verification</div>
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {STATUS_STEPS.slice(0, Math.max(state.currentStep, 5)).map((step:any)=>(
-                <div key={step.id} style={{display:'flex',alignItems:'center',gap:10}}>
-                  <span style={{width:12,height:12,borderRadius:'50%',background:state.currentStep >= step.id ? C.t : C.oV,flexShrink:0}}/>
-                  <div>
-                    <p style={{fontSize:13,fontWeight:700,color:C.oS}}>{step.lbl}</p>
-                    <p style={{fontSize:10,color:C.oSV,marginTop:2}}>{step.prt}</p>
+            <div style={{position:'absolute',right:-18,bottom:-18,width:140,height:140,borderRadius:'50%',background:'rgba(255,255,255,0.08)'}}/>
+          </div>
+
+          <div style={{background:'rgba(255,255,255,0.84)',borderRadius:18,padding:'28px 30px',boxShadow:'0 16px 50px rgba(30,58,95,0.06)',textAlign:'center'}}>
+            <div style={{width:104,height:104,borderRadius:22,margin:'0 auto 24px',background:'linear-gradient(135deg,#0c457c 0%,#1d8876 100%)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:34,fontWeight:900,boxShadow:'0 16px 28px rgba(0,72,141,0.18)'}}>
+              {String(state.name || 'RK').split(' ').map((part:string)=>part[0]).join('').slice(0,2).toUpperCase()}
+            </div>
+            <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.18em',color:'#717a8c'}}>Profile Completeness</div>
+            <div style={{marginTop:12,height:10,borderRadius:999,background:'rgba(194,198,212,0.55)',overflow:'hidden'}}>
+              <div style={{width:`${completion}%`,height:'100%',background:VG,borderRadius:999}}/>
+            </div>
+            <div style={{fontSize:13,color:C.oSV,marginTop:10}}>{completion}% Completed</div>
+          </div>
+
+          <div style={{background:'rgba(255,255,255,0.84)',borderRadius:18,padding:'24px 26px',boxShadow:'0 16px 50px rgba(30,58,95,0.06)'}}>
+            <div style={{borderLeft:'4px solid #1240b5',paddingLeft:18,fontSize:16,lineHeight:1.6,color:'#2b3446',fontStyle:'italic'}}>
+              "Need help finding your TPA? Check the back of your insurance card for a logo from MediAssist, Vidal Health, or Raksha."
+            </div>
+          </div>
+
+          <ConsentRecoveryCard state={state} setState={setState}/>
+        </div>
+      </div>
+    </PatientShell>
+  );
+}
+
+function PatientDashboardScreen({state,setState,setView,advance}: any) {
+  return (
+    <PatientShell notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}>
+      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1.45fr) 360px',gap:34,alignItems:'start'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:26}}>
+          <div>
+            <h1 style={{fontSize:56,fontWeight:900,color:C.oS,letterSpacing:'-0.04em',lineHeight:0.96,margin:'10px 0 14px'}}>Your Care Journey</h1>
+            <p style={{fontSize:18,color:'#31394a',lineHeight:1.6,maxWidth:760}}>Track your hospital booking, insurer progress, and next actions in one calm member workspace.</p>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:18}}>
+            {[
+              {l:'Current Claim',v:state.claimStatus || 'Pre-auth pending',c:C.p},
+              {l:'Next Appointment',v:state.selectedSlot || '04:00 PM',c:C.t},
+              {l:'Consent',v:state.consentRecovered?'Active':'Needs action',c:state.consentRecovered?C.t:'#d97706'},
+            ].map((card:any)=>(
+              <div key={card.l} style={{background:'rgba(255,255,255,0.86)',borderRadius:16,padding:20,boxShadow:'0 12px 34px rgba(30,58,95,0.05)'}}>
+                <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'#6a7284'}}>{card.l}</div>
+                <div style={{fontSize:24,fontWeight:900,color:card.c,marginTop:8}}>{card.v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:'rgba(255,255,255,0.86)',borderRadius:18,padding:28,boxShadow:'0 16px 46px rgba(30,58,95,0.06)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.18em',color:'#717a8c'}}>Coverage Timeline</div>
+                <div style={{fontSize:30,fontWeight:900,color:C.oS,marginTop:6}}>Today’s active claim journey</div>
+              </div>
+              <button onClick={()=>setView('claims')} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:14,fontWeight:800,color:'#1240b5'}}>Open details</button>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:22,marginTop:10}}>
+              {[
+                {id:1,title:'Appointment Confirmed',text:'Check-in completed at 09:45 AM.',done:true},
+                {id:2,title:'Treatment Details Submitted',text:'Clinical notes uploaded by provider.',done:true},
+                {id:3,title:'Medical Coding Completed',text:'CPT codes assigned for billing.',done:true},
+                {id:4,title:'Sent to Insurer',text:'Awaiting response from Star Health.',done:state.currentStep >= 10,active:true},
+                {id:5,title:'Final Decision',text:'Pending insurer evaluation.',done:state.currentStep >= 12,muted:true},
+              ].map((step:any, index:number, arr:any[])=>(
+                <div key={step.id} style={{display:'grid',gridTemplateColumns:'42px 1fr',gap:16,alignItems:'start'}}>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%'}}>
+                    <div style={{width:32,height:32,borderRadius:'50%',background:step.done ? (step.active ? C.p : C.t) : 'rgba(194,198,212,0.7)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:step.active?'0 0 0 6px rgba(0,72,141,0.12)':'none'}}>
+                      <Ic n={step.done ? (step.active ? 'sync_alt' : 'check') : 'circle'} f={1} s={16} col={step.done ? '#fff' : '#71809a'}/>
+                    </div>
+                    {index < arr.length - 1 ? <div style={{width:4,flex:1,background:'rgba(198,225,255,0.85)',borderRadius:999,marginTop:6}}/> : null}
+                  </div>
+                  <div style={{paddingTop:2}}>
+                    <div style={{fontSize:17,fontWeight:900,color:step.muted && !step.done ? '#8b93a5' : (step.active ? '#1240b5' : C.oS)}}>{step.title}</div>
+                    <div style={{fontSize:13,color:step.muted && !step.done ? '#a1a8b6' : '#4c5568',marginTop:4,lineHeight:1.55}}>{step.text}</div>
+                    {step.active ? <div style={{marginTop:14,background:'rgba(255,255,255,0.92)',borderRadius:14,padding:'18px 20px',boxShadow:'inset 4px 0 0 #1240b5, 0 8px 28px rgba(30,58,95,0.05)'}}><div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'#1240b5'}}>Status Update</div><div style={{fontSize:15,color:'#202938',fontStyle:'italic',lineHeight:1.6,marginTop:6}}>"Reviewing standard documentation. Expected completion in 3-5 business days."</div></div> : null}
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{display:'flex',gap:10,marginTop:16,flexWrap:'wrap'}}>
-              <CTA ch="Complete profile & insurance" onClick={()=>applyStateUpdate(setState, (s:any)=>({...s,currentStep:Math.max(s.currentStep,2)}), { actor:'Patient App', text:'Patient completed profile and insurance details', tone:C.t })} sm icon="task_alt"/>
-              <CTA ch="Book hospital slot" onClick={()=>applyStateUpdate(setState, (s:any)=>({...s,currentStep:Math.max(s.currentStep,2), selectedHospital:{name:'Apollo Hospitals'}}), { actor:'Patient App', text:'Patient booked hospital appointment and shared policy info', tone:C.p })} sm icon="event_available"/>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:26}}>
+              <CTA ch="Book hospital slot" sm icon="event_available" onClick={()=>{
+                applyStateUpdate(setState,(s:any)=>({...s,currentStep:Math.max(s.currentStep,2),selectedHospital:{name:'Apollo Hospitals'}}),{actor:'Patient App',text:'Patient booked hospital appointment from dashboard',tone:C.p});
+                advance(2);
+              }}/>
+              <CTA ch="Refresh claim status" sm icon="sync" onClick={()=>setUiNotice(setState,'Patient dashboard refreshed with the latest provider and insurer updates.',C.sec)}/>
+              <CTA ch="Complete profile" sm icon="badge" onClick={()=>setView('profile')}/>
             </div>
           </div>
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:16}}>
-          <ScenarioToggle scenario={state.demoScenario || 'healthy'} setScenario={(demoScenario:any)=>setState((s:any)=>({...s,demoScenario}))}/>
-          <ActivityTimeline items={state.activities} title="Patient-visible activity"/>
+        <div style={{display:'flex',flexDirection:'column',gap:22}}>
+          <ActivityTimeline items={state.activities} title="Member activity"/>
+          <div style={{background:VG,borderRadius:18,padding:'28px 28px',color:'#fff',boxShadow:'0 22px 44px rgba(0,72,141,0.22)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}>
+              <Ic n="shield" f={1} s={24} col="#fff"/>
+              <div style={{fontSize:18,fontWeight:900}}>Active Coverage</div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'rgba(255,255,255,0.84)'}}>
+              <span>Deductible met</span>
+              <span>₹2.45L / ₹3.0L</span>
+            </div>
+            <div style={{height:10,borderRadius:999,background:'rgba(255,255,255,0.22)',overflow:'hidden',marginTop:14}}>
+              <div style={{width:'81%',height:'100%',background:'#d6e3ff'}}/>
+            </div>
+            <p style={{fontSize:14,lineHeight:1.7,color:'rgba(255,255,255,0.86)',marginTop:20}}>You are currently in-network for most services. Review plan details for out-of-pocket maximums and cashless eligibility.</p>
+          </div>
         </div>
       </div>
-    ),
-    appointments: (
-      <PortalModulePage
-        eyebrow="Patient App"
-        title="Appointments"
-        summary="Track scheduled consultations, hospital arrival details, and prep steps before the claim enters the provider queue."
-        stats={[{l:'Upcoming',v:'1',c:C.p},{l:'Documents',v:`${(state.uploadedDocs||[]).length}`,c:C.t},{l:'Prep status',v:'Ready',c:C.sec}]}
-        actions={[
-          <CTA key="reschedule" ch="Reschedule" sm icon="event_repeat" onClick={()=>setUiNotice(setState,'Appointment moved to the next available hospital slot.',C.sec)}/>,
-          <CTA key="checkin" ch="Start check-in" sm icon="how_to_reg" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,currentStep:Math.max(s.currentStep,3)}),{actor:'Patient App',text:'Patient started digital hospital check-in',tone:C.t})}/>
-        ]}>
-        <OcrIntakeCard state={state} setState={setState}/>
-      </PortalModulePage>
-    ),
-    consent: (
-      <PortalModulePage
-        eyebrow="Patient App"
-        title="Consent Center"
-        summary="Manage clinical-data sharing approvals, insurer disclosures, and patient-visible consent status for the cashless claim journey."
-        stats={[{l:'Primary consent',v:'Treatment approved',c:C.t},{l:'Claims consent',v:consentRecovered?'Active':'Needs action',c:consentRecovered?C.t:'#d97706'},{l:'Last update',v:'Today',c:C.sec}]}>
-        <ConsentRecoveryCard state={state} setState={setState}/>
-      </PortalModulePage>
-    ),
-    claims: (
-      <PortalModulePage
-        eyebrow="Patient App"
-        title="Claims"
-        summary="Follow the claim from intake to adjudication with the same status model used by the provider and insurer teams."
-        stats={[{l:'Claim status',v:state.claimStatus || 'Awaiting submission',c:C.p},{l:'Decision',v:state.claimDecision || 'Pending',c:C.sec},{l:'Hospital',v:state.selectedHospital?.name || 'Apollo Hospitals',c:C.t}]}
-        actions={[
-          <CTA key="refresh" ch="Refresh status" sm icon="sync" onClick={()=>setUiNotice(setState,'Claim status refreshed from MediCode and insurer systems.',C.p)}/>,
-          <CTA key="messages" ch="Open messages" sm icon="chat" onClick={()=>setView('messages')}/>
-        ]}>
-        <ActivityTimeline items={state.activities} title="Claim activity"/>
-      </PortalModulePage>
-    ),
-    messages: (
-      <PortalModulePage
-        eyebrow="Patient App"
-        title="Messages"
-        summary="Hospital, coding, and insurer communications stay threaded here so the patient can respond to missing documents or consent requests."
-        stats={[{l:'Unread',v:'2',c:'#d97706'},{l:'Open requests',v:state.demoScenario==='missingDocs'?'1':'0',c:state.demoScenario==='missingDocs'?C.e:C.t},{l:'Last reply',v:'10 mins ago',c:C.sec}]}
-        actions={[
-          <CTA key="reply" ch="Send reply" sm icon="send" onClick={()=>setUiNotice(setState,'Patient reply sent to provider coordination team.',C.t)}/>,
-          <CTA key="upload" ch="Upload attachment" sm icon="attach_file" onClick={()=>setView('appointments')}/>
-        ]}>
-        <ActivityTimeline items={state.activities} title="Conversation timeline"/>
-      </PortalModulePage>
-    ),
+    </PatientShell>
+  );
+}
+
+function PatientClaimsScreen({state,setState,setView}: any) {
+  const visits = [
+    {name:'Dr. Alan Vance',specialty:'Physical Therapy',date:'Sep 28',claim:'Claim #SH-98112',status:'Paid',bg:C.tF,col:C.t},
+    {name:'Dr. Sarah Lora',specialty:'Dermatology',date:'Sep 15',claim:'Claim #SH-97554',status:'In Progress',bg:C.sFx,col:C.sec},
+  ];
+  return (
+    <PatientShell notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}>
+      <div>
+        <h1 style={{fontSize:56,fontWeight:900,color:C.oS,letterSpacing:'-0.04em',lineHeight:0.96,margin:'10px 0 14px'}}>My Appointments & Claims</h1>
+        <p style={{fontSize:18,color:'#31394a',lineHeight:1.6,maxWidth:860,marginBottom:34}}>Review your recent clinical visits and track the real-time status of your medical insurance claims.</p>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1.4fr) 0.9fr',gap:38,alignItems:'start'}}>
+        <div style={{background:'rgba(255,255,255,0.86)',borderRadius:18,padding:'34px 38px',boxShadow:'0 16px 46px rgba(30,58,95,0.06)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:26}}>
+            <div>
+              <Bdg ch="Active Claim" bg={C.pFx} col={C.p}/>
+              <div style={{fontSize:28,fontWeight:900,color:C.oS,marginTop:18}}>Cardiology Consultation</div>
+              <div style={{fontSize:18,color:'#31394a',marginTop:8}}>Dr. Helena Richardson • St. Jude Medical Plaza</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:18,fontWeight:900,color:C.oS}}>Oct 12, 2023</div>
+              <div style={{fontSize:14,color:C.oSV,marginTop:4}}>Ref: #SH-99281</div>
+            </div>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:26}}>
+            {[
+              {title:'Appointment Confirmed',text:'Check-in completed at 09:45 AM.',done:true},
+              {title:'Treatment Details Submitted',text:'Clinical notes uploaded by provider.',done:true},
+              {title:'Medical Coding Completed',text:'CPT codes assigned for billing.',done:true},
+              {title:'Sent to Insurer',text:'Awaiting response from Blue Shield.',done:true,active:true},
+              {title:'Final Decision',text:'Pending insurer evaluation.',done:false,muted:true},
+            ].map((step:any, index:number, arr:any[])=>(
+              <div key={step.title} style={{display:'grid',gridTemplateColumns:'42px 1fr',gap:16,alignItems:'start'}}>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',height:'100%'}}>
+                  <div style={{width:32,height:32,borderRadius:'50%',background:step.done ? (step.active ? C.p : C.t) : 'rgba(194,198,212,0.7)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:step.active?'0 0 0 6px rgba(0,72,141,0.12)':'none'}}>
+                    <Ic n={step.done ? (step.active ? 'sync_alt' : 'check') : 'circle'} f={1} s={16} col={step.done ? '#fff' : '#71809a'}/>
+                  </div>
+                  {index < arr.length - 1 ? <div style={{width:4,flex:1,background:'rgba(198,225,255,0.85)',borderRadius:999,marginTop:6}}/> : null}
+                </div>
+                <div style={{paddingTop:2}}>
+                  <div style={{fontSize:18,fontWeight:900,color:step.muted ? '#8b93a5' : (step.active ? '#1240b5' : C.oS)}}>{step.title}</div>
+                  <div style={{fontSize:13,color:step.muted ? '#a1a8b6' : '#4c5568',marginTop:4,lineHeight:1.55}}>{step.text}</div>
+                  {step.active ? <div style={{marginTop:16,background:'rgba(245,247,250,0.95)',borderRadius:14,padding:'18px 20px',boxShadow:'inset 4px 0 0 #1240b5'}}><div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'#1240b5'}}>Status Update</div><div style={{fontSize:15,color:'#202938',fontStyle:'italic',lineHeight:1.6,marginTop:6}}>"Reviewing standard documentation. Expected completion in 3-5 business days."</div></div> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:22}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:C.oS}}>Recent Visits</div>
+            <button onClick={()=>setUiNotice(setState,'Loaded the full visit archive.',C.sec)} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:14,fontWeight:800,color:'#1240b5'}}>View All</button>
+          </div>
+          {visits.map((visit:any)=>(
+            <div key={visit.name} style={{background:'rgba(255,255,255,0.86)',borderRadius:18,padding:'20px 24px',boxShadow:'0 16px 46px rgba(30,58,95,0.06)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',gap:12}}>
+                <div style={{display:'flex',gap:14}}>
+                  <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#1f517d 0%,#8fd2d6 100%)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:900,fontSize:18}}>{visit.name.split(' ').map((part:string)=>part[0]).slice(0,2).join('')}</div>
+                  <div>
+                    <div style={{fontSize:16,fontWeight:900,color:C.oS}}>{visit.name}</div>
+                    <div style={{fontSize:13,color:C.oSV,marginTop:6}}>{visit.specialty}</div>
+                  </div>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:15,fontWeight:900,color:C.oS}}>{visit.date.toUpperCase()}</div>
+                  <div style={{marginTop:10}}><Bdg ch={visit.status} bg={visit.bg} col={visit.col}/></div>
+                </div>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:20,paddingTop:16,boxShadow:'inset 0 1px 0 rgba(194,198,212,0.25)'}}>
+                <div style={{fontSize:13,color:'#414a5d'}}>{visit.claim}</div>
+                <button onClick={()=>setUiNotice(setState,`Opened visit details for ${visit.name}.`,C.p)} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:14,fontWeight:900,color:'#1240b5'}}>Details ›</button>
+              </div>
+            </div>
+          ))}
+          <div style={{background:VG,borderRadius:18,padding:'28px 30px',color:'#fff',boxShadow:'0 22px 44px rgba(0,72,141,0.22)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18}}><Ic n="shield" f={1} s={22} col="#fff"/><div style={{fontSize:18,fontWeight:900}}>Active Coverage</div></div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'rgba(255,255,255,0.84)'}}>
+              <span>Deductible met</span>
+              <span>₹2.45L / ₹3.0L</span>
+            </div>
+            <div style={{height:10,borderRadius:999,background:'rgba(255,255,255,0.22)',overflow:'hidden',marginTop:14}}>
+              <div style={{width:'81%',height:'100%',background:'#d6e3ff'}}/>
+            </div>
+            <p style={{fontSize:14,lineHeight:1.7,color:'rgba(255,255,255,0.86)',marginTop:20}}>You are currently in-network for most services. Review your plan details or chat with support for payment timelines.</p>
+          </div>
+        </div>
+      </div>
+    </PatientShell>
+  );
+}
+
+function PatientProvidersScreen({state,setState}: any) {
+  const providers = [
+    {name:'Bay Area General Hospital',address:'450 Medical Center Plaza, San Francisco, CA 94117',distance:'0.8 miles away',tags:['Emergency 24/7','Diagnostic Imaging']},
+    {name:'Mission Health Diagnostics',address:'1201 Valencia St, San Francisco, CA 94110',distance:'1.2 miles away',tags:['MRI & CT']},
+    {name:'Presidio Pediatric Center',address:'88 Graham St, San Francisco, CA 94129',distance:'2.5 miles away',tags:['Pediatrics']},
+  ];
+  return (
+    <PatientShell notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}>
+      <div style={{display:'grid',gridTemplateColumns:'420px minmax(0,1fr)',gap:0,background:'rgba(255,255,255,0.45)',borderRadius:22,overflow:'hidden',boxShadow:'0 20px 50px rgba(30,58,95,0.05)'}}>
+        <div style={{padding:'26px 30px 28px',background:'rgba(244,247,250,0.88)'}}>
+          <h1 style={{fontSize:30,fontWeight:900,color:C.oS,letterSpacing:'-0.03em',margin:'4px 0 10px'}}>Find a Provider</h1>
+          <p style={{fontSize:16,color:'#31394a',lineHeight:1.6,maxWidth:340}}>Search through our 2,400+ certified medical partners within your network coverage.</p>
+          <div style={{display:'flex',flexDirection:'column',gap:20,marginTop:26}}>
+            <PatientField label="City Or Zip Code" placeholder="San Francisco, CA" value={state.providerSearch || 'San Francisco, CA'} onChange={(e:any)=>setState((s:any)=>({...s,providerSearch:e.target.value}))} icon="location_on"/>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+              <PatientField label="Provider Type" placeholder="Hospitals" value={state.providerType || 'Hospitals'} onChange={(e:any)=>setState((s:any)=>({...s,providerType:e.target.value}))} icon="expand_more"/>
+              <PatientField label="Specialty" placeholder="Cardiology" value={state.providerSpecialty || 'Cardiology'} onChange={(e:any)=>setState((s:any)=>({...s,providerSpecialty:e.target.value}))} icon="expand_more"/>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div style={{fontSize:12,fontWeight:800,color:'#616b7e',textTransform:'uppercase',letterSpacing:'0.08em'}}>8 Results Found</div>
+              <button onClick={()=>setUiNotice(setState,'Sorted providers by network strength and distance.',C.p)} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:14,fontWeight:900,color:'#1240b5',display:'flex',alignItems:'center',gap:6}}><Ic n="sort" s={16} col="#1240b5"/>Sort</button>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              {providers.map((provider:any)=>(
+                <div key={provider.name} style={{background:'rgba(255,255,255,0.9)',borderRadius:18,padding:'20px 20px 18px',boxShadow:'0 14px 34px rgba(30,58,95,0.05)',position:'relative'}}>
+                  <div style={{position:'absolute',left:0,top:0,bottom:0,width:4,borderRadius:'18px 0 0 18px',background:'#1240b5'}}/>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                    <Bdg ch="In-Network" bg="#7cf09a" col="#085f2a"/>
+                    <div style={{fontSize:12,color:'#5f6879'}}>{provider.distance}</div>
+                  </div>
+                  <div style={{fontSize:22,fontWeight:900,color:'#1240b5',lineHeight:1.15}}>{provider.name}</div>
+                  <div style={{fontSize:13,color:'#384153',lineHeight:1.65,marginTop:10}}>{provider.address}</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:18}}>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+                      {provider.tags.map((tag:string)=><span key={tag} style={{padding:'7px 11px',borderRadius:8,background:'rgba(230,232,233,0.8)',fontSize:11,fontWeight:700,color:'#42506b'}}>{tag}</span>)}
+                    </div>
+                    <button onClick={()=>{
+                      applyStateUpdate(setState,(s:any)=>({...s,selectedProvider:provider.name,selectedHospital:{name:provider.name}}),{actor:'Patient App',text:`Selected provider ${provider.name} from network search`,tone:C.t});
+                    }} style={{background:'transparent',border:'none',cursor:'pointer',display:'flex',color:'#1240b5'}}>
+                      <Ic n="chevron_right" s={24} col="#1240b5"/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{position:'relative',minHeight:920,background:'linear-gradient(180deg,#8dd5eb 0%,#8fd6f1 14%,#d9eef7 14%,#dff1f7 100%)'}}>
+          <div style={{position:'absolute',inset:0,background:'radial-gradient(circle at 18% 12%, rgba(255,255,255,0.8) 0, rgba(255,255,255,0.8) 3%, transparent 4%), radial-gradient(circle at 74% 22%, rgba(255,255,255,0.8) 0, rgba(255,255,255,0.8) 3%, transparent 4%), linear-gradient(135deg, rgba(60,140,200,0.22) 0%, rgba(255,255,255,0) 26%), linear-gradient(90deg, transparent 0, transparent 44%, rgba(99,122,175,0.22) 44%, rgba(99,122,175,0.22) 45%, transparent 45%, transparent 100%)'}}/>
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg, transparent 0%, transparent 80%, rgba(255,255,255,0.28) 80%, rgba(255,255,255,0.28) 81%, transparent 81%), linear-gradient(90deg, transparent 0%, transparent 22%, rgba(255,255,255,0.24) 22%, rgba(255,255,255,0.24) 23%, transparent 23%, transparent 100%)'}}/>
+          <div style={{position:'absolute',top:22,right:24,display:'flex',flexDirection:'column',gap:14}}>
+            {['add','remove','my_location'].map((icon:string)=>(
+              <button key={icon} onClick={()=>setUiNotice(setState,`${icon === 'my_location' ? 'Re-centered' : icon === 'add' ? 'Zoomed in on' : 'Zoomed out of'} the provider map.`,C.sec)} style={{width:66,height:66,borderRadius:16,background:'rgba(255,255,255,0.92)',border:'none',cursor:'pointer',boxShadow:'0 16px 34px rgba(30,58,95,0.08)'}}>
+                <Ic n={icon} s={26} col={C.oS}/>
+              </button>
+            ))}
+          </div>
+          {[
+            {top:'44%',left:'30%',icon:'local_hospital'},
+            {top:'55%',left:'72%',icon:'medical_services'},
+            {top:'70%',left:'26%',icon:'shopping_cart'},
+          ].map((pin:any)=>(
+            <div key={`${pin.top}-${pin.left}`} style={{position:'absolute',top:pin.top,left:pin.left,width:52,height:52,borderRadius:18,background:'#0d56ab',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 14px 28px rgba(0,72,141,0.24), 0 0 0 6px rgba(255,255,255,0.5)'}}>
+              <Ic n={pin.icon} s={22} col="#fff"/>
+            </div>
+          ))}
+          <div style={{position:'absolute',right:30,bottom:36,width:300,background:'rgba(255,255,255,0.94)',borderRadius:20,padding:'24px 24px 26px',boxShadow:'0 18px 44px rgba(30,58,95,0.12)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:16}}>
+              <div style={{width:62,height:62,borderRadius:16,background:'#0d56ab',display:'flex',alignItems:'center',justifyContent:'center'}}><Ic n="medical_services" s={24} col="#fff"/></div>
+              <div>
+                <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'#1240b5'}}>Selected Facility</div>
+                <div style={{fontSize:13,fontWeight:800,color:'#0b6c30',marginTop:6}}>Direct billing enabled</div>
+              </div>
+            </div>
+            <p style={{fontSize:14,color:'#384153',lineHeight:1.7,marginBottom:20}}>{state.selectedProvider || 'Mission Health Diagnostics'} is a premier partner offering real-time claims processing for Sanctuary Health members.</p>
+            <button onClick={()=>{
+              applyStateUpdate(setState,(s:any)=>({...s,selectedHospital:{name:state.selectedProvider || 'Mission Health Diagnostics'},currentStep:Math.max(s.currentStep,2)}),{actor:'Patient App',text:`Requested directions and selected ${state.selectedProvider || 'Mission Health Diagnostics'} for care`,tone:C.t});
+            }} style={{width:'100%',padding:'16px 18px',borderRadius:12,background:VG,color:'#fff',border:'none',cursor:'pointer',fontSize:16,fontWeight:900,boxShadow:'0 16px 30px rgba(0,72,141,0.22)'}}>Get Directions</button>
+          </div>
+        </div>
+      </div>
+    </PatientShell>
+  );
+}
+
+function PatientBenefitsScreen({state,setState,setView}: any) {
+  return (
+    <PatientShell notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}>
+      <div style={{display:'grid',gridTemplateColumns:'1.2fr 0.9fr',gap:34,alignItems:'start'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:24}}>
+          <div>
+            <h1 style={{fontSize:54,fontWeight:900,color:C.oS,letterSpacing:'-0.04em',lineHeight:0.98,margin:'10px 0 14px'}}>Benefits & Protection</h1>
+            <p style={{fontSize:18,color:'#31394a',lineHeight:1.6,maxWidth:760}}>See what is covered, how close you are to your deductible, and where consent or policy issues may slow the claim.</p>
+          </div>
+          <div style={{background:VG,borderRadius:20,padding:'30px 32px',color:'#fff',boxShadow:'0 22px 44px rgba(0,72,141,0.22)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+              <div style={{fontSize:24,fontWeight:900}}>Active Coverage</div>
+              <Bdg ch="In-network" bg="rgba(255,255,255,0.18)" col="#fff"/>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'rgba(255,255,255,0.82)'}}>Plan</div>
+                <div style={{fontSize:30,fontWeight:900,marginTop:8}}>{state.coverageType || 'Comprehensive Care'}</div>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'rgba(255,255,255,0.82)'}}>Policy Number</div>
+                <div style={{fontSize:24,fontWeight:900,marginTop:8}}>{state.policy}</div>
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'rgba(255,255,255,0.84)',marginTop:24}}>
+              <span>Deductible met</span>
+              <span>₹2.45L / ₹3.0L</span>
+            </div>
+            <div style={{height:10,borderRadius:999,background:'rgba(255,255,255,0.22)',overflow:'hidden',marginTop:14}}>
+              <div style={{width:'81%',height:'100%',background:'#d6e3ff'}}/>
+            </div>
+            <p style={{fontSize:14,lineHeight:1.7,color:'rgba(255,255,255,0.86)',marginTop:20}}>You are currently in-network for most services. Review your plan details for out-of-pocket maximums and direct billing availability.</p>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+            {[
+              {title:'Cashless Access',text:'Apollo Hospitals and Mission Health Diagnostics support direct billing.',tone:C.t,bg:'rgba(141,249,169,0.36)'},
+              {title:'Claim Watch',text:state.demoScenario==='policyMismatch'?'Waiting period conflict detected for current request.':'No insurer exceptions on the active claim.',tone:state.demoScenario==='policyMismatch'?C.e:C.sec,bg:state.demoScenario==='policyMismatch'?'rgba(255,218,214,0.82)':'rgba(214,227,255,0.72)'},
+            ].map((card:any)=>(
+              <div key={card.title} style={{background:'rgba(255,255,255,0.86)',borderRadius:18,padding:'24px 24px 26px',boxShadow:'0 16px 46px rgba(30,58,95,0.06)'}}>
+                <div style={{fontSize:18,fontWeight:900,color:C.oS}}>{card.title}</div>
+                <div style={{marginTop:14,padding:'12px 14px',borderRadius:12,background:card.bg,fontSize:14,fontWeight:700,color:card.tone,lineHeight:1.55}}>{card.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:22}}>
+          <ConsentRecoveryCard state={state} setState={setState}/>
+          <div style={{background:'rgba(255,255,255,0.86)',borderRadius:18,padding:'24px 26px',boxShadow:'0 16px 46px rgba(30,58,95,0.06)'}}>
+            <div style={{fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.16em',color:'#717a8c'}}>Recommended Actions</div>
+            <div style={{display:'flex',flexDirection:'column',gap:12,marginTop:16}}>
+              <CTA ch="Review profile" sm icon="badge" onClick={()=>setView('profile')}/>
+              <CTA ch="Find in-network care" sm icon="search" onClick={()=>setView('providers')}/>
+              <CTA ch="Open claim timeline" sm icon="timeline" onClick={()=>setView('claims')}/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </PatientShell>
+  );
+}
+
+function PatientApp({state,setState,advance}: any) {
+  const [view,setView] = useState('profile');
+  const patientViews:any = {
+    dashboard: <PatientDashboardScreen state={state} setState={setState} setView={setView} advance={advance}/>,
+    providers: <PatientProvidersScreen state={state} setState={setState}/>,
+    claims: <PatientClaimsScreen state={state} setState={setState} setView={setView}/>,
+    benefits: <PatientBenefitsScreen state={state} setState={setState} setView={setView}/>,
+    profile: <PatientProfileScreen state={state} setState={setState} advance={advance} setView={setView}/>,
   };
   return (
-    <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar
-        items={patientNav}
-        active={view}
-        onNav={setView}
-        sub="Patient"
-        onNewEntry={()=>setUiNotice(setState,'New patient request draft opened.',C.p)}
-        onSignOut={()=>setUiNotice(setState,'Demo mode keeps the patient session active.',C.sec)}
-      />
-      <TopBar onNotifications={()=>setView('messages')}/>
-      <div style={{marginLeft:240,marginTop:96,flex:1,padding:32,background:C.s,minHeight:'calc(100vh - 96px)'}}>
-        <ActionBanner notice={state.uiNotice} onDismiss={()=>setState((s:any)=>({...s,uiNotice:null}))}/>
+    <div style={{minHeight:'100vh'}}>
+      <PatientTopNav view={view} setView={setView}/>
+      <div style={{marginTop:0}}>
         {patientViews[view]}
       </div>
     </div>
@@ -2293,7 +2659,10 @@ export default function App() {
   const [gs,setGs] = useState({
     currentStep:3,name:'Ravi Kumar',dob:'15/04/1990',phone:'+91 98765 43210',
     email:'ravi@email.com',policy:'POL-2024-004521',insurer:'Star Health',
-    sumInsured:'5,00,000',validity:'31/03/2026',
+    sumInsured:'5,00,000',validity:'31/03/2026',gender:'Male',aadhaar:'5678 9012 3456',
+    tpa:'MediAssist',coverageType:'Comprehensive Care',policyStart:'01/04/2025',
+    providerSearch:'San Francisco, CA',providerType:'Hospitals',providerSpecialty:'Cardiology',
+    profileSaved:false,selectedProvider:'Mission Health Diagnostics',
     selectedHospital:{name:'Apollo Hospitals'},selectedSlot:'04:00 PM',
     claimStatus:null,claimDecision:null,estCost:'12,500',preAuthSent:false,demoScenario:'healthy',
     uploadedDocs:['Pre-auth form'],
