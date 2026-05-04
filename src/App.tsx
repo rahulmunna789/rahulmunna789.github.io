@@ -199,6 +199,9 @@ const DEMO_SCENARIOS = [
   {id:'lowConfidence',lbl:'Low Confidence AI',desc:'Narrative ambiguity reduces coding confidence.'},
   {id:'policyMismatch',lbl:'Policy Mismatch',desc:'Coverage validation and waiting period checks fail.'},
   {id:'consentHold',lbl:'Consent Hold',desc:'Patient consent for data sharing is incomplete.'},
+  {id:'returnedClaim',lbl:'Returned / Denied',desc:'Insurer sends claim back for re-work and structured resubmission.'},
+  {id:'reimbursement',lbl:'Reimbursement',desc:'Non-network treatment requires post-discharge reimbursement processing.'},
+  {id:'pmjay',lbl:'AB-PMJAY',desc:'Government-scheme claim follows PM-JAY package and compliance rules.'},
 ];
 
 const SCENARIO_META = {
@@ -310,6 +313,72 @@ const SCENARIO_META = {
       {l:'Identity match',v:98,tone:C.t},
       {l:'Document OCR confidence',v:91,tone:C.t},
       {l:'Sync latency',v:15,suffix:'s',tone:C.p},
+    ],
+  },
+  returnedClaim: {
+    tone:C.e,
+    bg:C.eC,
+    label:'Demo state: Returned / denied',
+    alert:'The insurer has returned the claim for correction, and the hospital + MediCode teams must work a formal resubmission loop.',
+    explainability:[
+      {k:'Return reason',v:'Tariff mismatch, missing implant invoice, and inconsistent package coding require claim re-work.'},
+      {k:'Resubmission path',v:'Hospital updates packet, MediCode rebuilds claim payload, and insurer SLA clock restarts on re-send.'},
+      {k:'Operational risk',v:'Cashless claims in India often require at least one resubmission; denial closure without loop is unacceptable.'},
+    ],
+    audit:[
+      {evt:'Claim returned to provider desk', who:'Insurer Portal', when:'09:11 AM', ok:false},
+      {evt:'Re-work task created', who:'Hospital Claims Desk', when:'09:14 AM', ok:true},
+      {evt:'Resubmission SLA timer started', who:'MediCode Workflow', when:'09:15 AM', ok:true},
+    ],
+    quality:[
+      {l:'Source completeness',v:82,tone:'#d97706'},
+      {l:'Identity match',v:98,tone:C.t},
+      {l:'Document OCR confidence',v:78,tone:'#d97706'},
+      {l:'Sync latency',v:54,suffix:'s',tone:C.e},
+    ],
+  },
+  reimbursement: {
+    tone:C.sec,
+    bg:C.sFx,
+    label:'Demo state: Reimbursement',
+    alert:'The patient was treated outside the cashless network, so the claim must move through discharge-file reimbursement instead of pre-auth.',
+    explainability:[
+      {k:'Track change',v:'Patient submits bills, discharge summary, payment receipts, and bank details after hospitalization.'},
+      {k:'India reality',v:'Tier 2/3 care frequently lands outside network hospitals, making reimbursement a major operating path.'},
+      {k:'Processing note',v:'SLA and fraud checks differ from cashless because pre-auth is absent and receipt validation becomes critical.'},
+    ],
+    audit:[
+      {evt:'Reimbursement intake opened', who:'Patient App', when:'10:02 AM', ok:true},
+      {evt:'Receipt validation queued', who:'Hospital Claims Desk', when:'10:08 AM', ok:true},
+      {evt:'Bank payout checks pending', who:'Insurer Portal', when:'10:10 AM', ok:false},
+    ],
+    quality:[
+      {l:'Source completeness',v:76,tone:'#d97706'},
+      {l:'Identity match',v:97,tone:C.t},
+      {l:'Document OCR confidence',v:86,tone:C.sec},
+      {l:'Sync latency',v:38,suffix:'s',tone:C.p},
+    ],
+  },
+  pmjay: {
+    tone:'#0f766e',
+    bg:'#ccfbf1',
+    label:'Demo state: AB-PMJAY',
+    alert:'Claim is routed through AB-PMJAY package logic with government-scheme formatting, empanelment checks, and mandated reporting.',
+    explainability:[
+      {k:'Scheme routing',v:'Hospital and payer payloads follow PM-JAY package codes, beneficiary entitlement checks, and public reporting rules.'},
+      {k:'Market importance',v:'Ayushman Bharat volume is too large to treat as edge support; it must appear as a first-class claim path.'},
+      {k:'Operational dependency',v:'Empanelment, package rates, and scheme compliance differ from private TPA cashless claims.'},
+    ],
+    audit:[
+      {evt:'PM-JAY beneficiary verified', who:'Govt Scheme Gateway', when:'07:52 AM', ok:true},
+      {evt:'Package code mapped', who:'Hospital HIS', when:'07:57 AM', ok:true},
+      {evt:'State trust validation pending', who:'Insurer / SHA Node', when:'08:01 AM', ok:false},
+    ],
+    quality:[
+      {l:'Source completeness',v:90,tone:'#0f766e'},
+      {l:'Identity match',v:99,tone:C.t},
+      {l:'Document OCR confidence',v:88,tone:C.sec},
+      {l:'Sync latency',v:26,suffix:'s',tone:C.p},
     ],
   },
 };
@@ -1193,6 +1262,155 @@ function OcrIntakeCard({state,setState}: any) {
   );
 }
 
+function ClaimTrackCard({state,setState}: any) {
+  const track = state.claimTrack || 'cashless';
+  const scheme = state.schemeType || 'private';
+  return (
+    <div style={{background:C.s0,borderRadius:16,padding:18,boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div>
+          <SL ch="India Claim Mix"/>
+          <p style={{fontSize:16,fontWeight:800,color:C.oS,marginTop:4}}>Track & Scheme Routing</p>
+        </div>
+        <Bdg ch={track==='cashless'?'Cashless':'Reimbursement'} bg={track==='cashless'?C.tF:C.sFx} col={track==='cashless'?C.t:C.sec}/>
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+        {[
+          {id:'cashless',lbl:'Cashless pre-auth'},
+          {id:'reimbursement',lbl:'Reimbursement'},
+        ].map((item:any)=>(
+          <button key={item.id} onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,claimTrack:item.id,demoScenario:item.id==='reimbursement'?'reimbursement':s.demoScenario}),{
+            actor:'Demo UI',
+            text:`Switched claim track to ${item.lbl}.`,
+            tone:item.id==='cashless'?C.t:C.sec,
+          })} style={{padding:'8px 12px',borderRadius:10,border:'none',cursor:'pointer',fontSize:11,fontWeight:800,background:track===item.id?(item.id==='cashless'?C.tF:C.sFx):C.sL,color:track===item.id?(item.id==='cashless'?C.t:C.sec):C.oSV}}>
+            {item.lbl}
+          </button>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {[
+          {id:'private',lbl:'Private insurer'},
+          {id:'pmjay',lbl:'AB-PMJAY'},
+        ].map((item:any)=>(
+          <button key={item.id} onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,schemeType:item.id,demoScenario:item.id==='pmjay'?'pmjay':s.demoScenario}),{
+            actor:'Demo UI',
+            text:`Scheme route set to ${item.lbl}.`,
+            tone:item.id==='pmjay'?'#0f766e':C.p,
+          })} style={{padding:'8px 12px',borderRadius:10,border:'none',cursor:'pointer',fontSize:11,fontWeight:800,background:scheme===item.id?(item.id==='pmjay'?'#ccfbf1':C.pFx):C.sL,color:scheme===item.id?(item.id==='pmjay'?'#0f766e':C.p):C.oSV}}>
+            {item.lbl}
+          </button>
+        ))}
+      </div>
+      <p style={{fontSize:12,color:C.oSV,lineHeight:1.55,marginTop:12}}>
+        {track==='cashless'
+          ? 'Cashless mode drives pre-auth, direct hospital settlement, and live TPA / insurer responses.'
+          : 'Reimbursement mode expects discharge packet upload, receipt validation, and post-treatment bank payout checks.'}
+      </p>
+    </div>
+  );
+}
+
+function NationalExchangeCard({state,setState}: any) {
+  const scenario = state.demoScenario || 'healthy';
+  const nhcx = scenario==='healthy' || scenario==='pmjay' ? 'Connected' : scenario==='returnedClaim' ? 'Resubmission payload pending' : 'Needs attention';
+  const iib = scenario==='returnedClaim' ? 'Duplicate scan re-run' : scenario==='policyMismatch' ? 'Possible policy conflict' : 'Clear';
+  return (
+    <div style={{background:C.s0,borderRadius:16,padding:18,boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div>
+          <SL ch="National Rails"/>
+          <p style={{fontSize:16,fontWeight:800,color:C.oS,marginTop:4}}>NHCX / IIB Integration</p>
+        </div>
+        <Bdg ch={nhcx} bg={nhcx==='Connected'?'#d1fae5':nhcx==='Needs attention'?C.eC:'#fef3c7'} col={nhcx==='Connected'?'#0f766e':nhcx==='Needs attention'?C.e:'#d97706'} s={9}/>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{background:C.sL,borderRadius:12,padding:14}}>
+          <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>NHCX</p>
+          <p style={{fontSize:15,fontWeight:800,color:C.oS,marginTop:6}}>IRDAI 2025 Exchange</p>
+          <p style={{fontSize:12,color:C.oSV,lineHeight:1.55,marginTop:8}}>Payload routing for pre-auth, claim, return, and resubmission packets.</p>
+        </div>
+        <div style={{background:C.sL,borderRadius:12,padding:14}}>
+          <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>IIB</p>
+          <p style={{fontSize:15,fontWeight:800,color:C.oS,marginTop:6}}>{iib}</p>
+          <p style={{fontSize:12,color:C.oSV,lineHeight:1.55,marginTop:8}}>Insurance Information Bureau duplicate-claim and prior-loss validation.</p>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:14}}>
+        <CTA ch="Run duplicate scan" sm icon="content_paste_search" onClick={()=>setUiNotice(setState,'IIB duplicate-claim scan completed and logged in the audit trail.',C.p)}/>
+        <CTA ch="Prepare NHCX packet" sm icon="hub" onClick={()=>setUiNotice(setState,'NHCX payload prepared for outbound claim routing.',C.t)}/>
+      </div>
+    </div>
+  );
+}
+
+function TpaAdapterCard({state,setState}: any) {
+  const adapter = state.tpaAdapter || 'Medi Assist';
+  return (
+    <div style={{background:C.s0,borderRadius:16,padding:18,boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div>
+          <SL ch="Integration Reality"/>
+          <p style={{fontSize:16,fontWeight:800,color:C.oS,marginTop:4}}>TPA Adapter Layer</p>
+        </div>
+        <Bdg ch={adapter} bg={C.pFx} col={C.p}/>
+      </div>
+      <p style={{fontSize:12,color:C.oSV,lineHeight:1.6,marginBottom:12}}>
+        Real TPAs do not expose clean FHIR endpoints. This layer maps proprietary payloads from Medi Assist, Paramount, MD India, and similar partners.
+      </p>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        {[
+          ['Primary adapter', adapter],
+          ['Payload mode', 'Custom JSON / XML'],
+          ['Retry policy', '3 attempts'],
+          ['Ack SLA', '15 minutes'],
+        ].map(([k,v])=>(
+          <div key={k} style={{background:C.sL,borderRadius:10,padding:12}}>
+            <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>{k}</p>
+            <p style={{fontSize:13,fontWeight:800,color:C.oS,marginTop:5}}>{v}</p>
+          </div>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>
+        {['Medi Assist','Paramount','MD India','Health India'].map((name:string)=>(
+          <button key={name} onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,tpaAdapter:name}),{
+            actor:'Integration Hub',
+            text:`Switched demo TPA adapter to ${name}.`,
+            tone:C.sec,
+          })} style={{padding:'7px 10px',borderRadius:999,border:'none',cursor:'pointer',fontSize:10,fontWeight:800,background:adapter===name?C.sFx:C.sL,color:adapter===name?C.sec:C.oSV}}>
+            {name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReworkLoopCard({state,setState}: any) {
+  const loopState = state.denialLoopStatus || 'Not triggered';
+  const resubmissions = state.resubmissionCount || 0;
+  return (
+    <div style={{background:C.s0,borderRadius:16,padding:18,boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div>
+          <SL ch="Critical Gap Fix"/>
+          <p style={{fontSize:16,fontWeight:800,color:C.oS,marginTop:4}}>Denial / Return Management Loop</p>
+        </div>
+        <Bdg ch={`${resubmissions} resubmissions`} bg={resubmissions?C.eC:C.sL} col={resubmissions?C.e:C.oSV}/>
+      </div>
+      <div style={{background:C.sL,borderRadius:12,padding:14,marginBottom:12}}>
+        <p style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.1em',color:C.out}}>Current status</p>
+        <p style={{fontSize:14,fontWeight:800,color:C.oS,marginTop:5}}>{loopState}</p>
+        <p style={{fontSize:12,color:C.oSV,lineHeight:1.55,marginTop:8}}>Returned or denied claims now stay alive through hospital query resolution, coding correction, insurer query tracking, and formal resubmission.</p>
+      </div>
+      <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+        <CTA ch="Open re-work case" sm icon="assignment_late" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,denialLoopStatus:'Re-work case opened',claimStatus:'returned'}),{actor:'Insurer Portal',text:'Opened returned-claim re-work case for hospital and MediCode teams.',tone:C.e})}/>
+        <CTA ch="Resubmit claim" sm icon="send" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,resubmissionCount:(s.resubmissionCount||0)+1,denialLoopStatus:'Resubmitted to insurer',claimStatus:'resubmitted'}),{actor:'MediCode Workflow',text:'Resubmitted corrected claim back to insurer queue.',tone:C.t})}/>
+      </div>
+    </div>
+  );
+}
+
 function ExceptionActionsCard({state,setState}: any) {
   const scenario = state.demoScenario || 'healthy';
   const actions = [];
@@ -1227,6 +1445,37 @@ function ExceptionActionsCard({state,setState}: any) {
       label:'Launch consent recovery',
       icon:'verified_user',
       run:()=>applyStateUpdate(setState, (s:any)=>({...s,exceptionAction:'Consent recovery launched',consentLinkSent:true}), { actor:'Patient App', text:'Consent recovery flow launched for insurer data-sharing approval', tone:'#d97706' }),
+    });
+  }
+  if (scenario === 'returnedClaim' || state.claimStatus === 'returned' || state.claimStatus === 'denied') {
+    actions.push({
+      label:'Create resubmission packet',
+      icon:'assignment_returned',
+      run:()=>applyStateUpdate(setState, (s:any)=>({
+        ...s,
+        exceptionAction:'Resubmission packet created',
+        denialLoopStatus:'Hospital correcting and rebuilding claim packet',
+        claimStatus:'rework-in-progress',
+      }), { actor:'Hospital Claims Desk', text:'Created returned-claim packet for structured re-work and resubmission.', tone:C.e }),
+    });
+    actions.push({
+      label:'Send query to hospital',
+      icon:'forum',
+      run:()=>applyStateUpdate(setState, (s:any)=>({...s,queryToHospitalOpen:true,exceptionAction:'Insurer query routed to hospital desk'}), { actor:'Insurer Review', text:'Query routed back to hospital for tariff and document clarification.', tone:C.sec }),
+    });
+  }
+  if (scenario === 'reimbursement') {
+    actions.push({
+      label:'Start reimbursement file',
+      icon:'payments',
+      run:()=>applyStateUpdate(setState, (s:any)=>({...s,claimTrack:'reimbursement',exceptionAction:'Reimbursement claim file opened'}), { actor:'Patient App', text:'Opened reimbursement track with receipts and discharge-file checklist.', tone:C.sec }),
+    });
+  }
+  if (scenario === 'pmjay') {
+    actions.push({
+      label:'Generate PM-JAY package',
+      icon:'health_metrics',
+      run:()=>applyStateUpdate(setState, (s:any)=>({...s,schemeType:'pmjay',exceptionAction:'PM-JAY package prepared'}), { actor:'Govt Scheme Gateway', text:'Prepared PM-JAY package payload and beneficiary validation bundle.', tone:'#0f766e' }),
     });
   }
   if (!actions.length) return null;
@@ -1279,12 +1528,16 @@ function HospitalHIS({state,setState,advance}: any) {
         eyebrow="Hospital HIS"
         title="Operations Dashboard"
         summary="Monitor intake volume, pending pre-auth requests, and patient readiness before the claim package moves downstream."
-        stats={[{l:'Ready for review',v:'12',c:C.p},{l:'Waiting docs',v:state.demoScenario==='missingDocs'?'4':'1',c:state.demoScenario==='missingDocs'?C.e:'#d97706'},{l:'Cashless in progress',v:'9',c:C.t}]}
+        stats={[{l:'Ready for review',v:'12',c:C.p},{l:'Waiting docs',v:state.demoScenario==='missingDocs'?'4':'1',c:state.demoScenario==='missingDocs'?C.e:'#d97706'},{l:'Cashless in progress',v:'9',c:C.t},{l:'Reimbursement files',v:state.claimTrack==='reimbursement'?'6':'2',c:C.sec}]}
         actions={[
           <CTA key="openIntake" ch="Open intake queue" sm icon="move_to_inbox" onClick={()=>setView('intake')}/>,
-          <CTA key="workbench" ch="Open workbench" sm icon="smart_toy" onClick={()=>setView('workbench')}/>
+          <CTA key="workbench" ch="Open workbench" sm icon="smart_toy" onClick={()=>setView('workbench')}/>,
+          <CTA key="reimbursement" ch="Start reimbursement" sm icon="payments" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,claimTrack:'reimbursement',demoScenario:'reimbursement'}),{actor:'Hospital HIS',text:'Hospital routed patient into reimbursement claims track.',tone:C.sec})}/>
         ]}>
-        <ActivityTimeline items={state.activities} title="Hospital activity"/>
+        <div style={{display:'grid',gridTemplateColumns:'1.1fr 1fr',gap:18}}>
+          <ActivityTimeline items={state.activities} title="Hospital activity"/>
+          <ClaimTrackCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     patients: (
@@ -1310,7 +1563,10 @@ function HospitalHIS({state,setState,advance}: any) {
           <CTA key="policy" ch="Resolve mismatch" sm icon="policy" onClick={()=>setUiNotice(setState,'Policy exception routed to insurer review desk.',C.e)}/>,
           <CTA key="sendPreauth" ch="Go to treatment review" sm icon="description" onClick={()=>setView('treatment')}/>
         ]}>
-        <ExceptionActionsCard state={state} setState={setState}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <ExceptionActionsCard state={state} setState={setState}/>
+          <TpaAdapterCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     claims: (
@@ -1318,12 +1574,16 @@ function HospitalHIS({state,setState,advance}: any) {
         eyebrow="Hospital HIS"
         title="Hospital Claims"
         summary="Track pre-auth submissions, returned document requests, and synchronization back from MediCode and the insurer."
-        stats={[{l:'Submitted today',v:'9',c:C.p},{l:'Returned',v:state.demoScenario==='missingDocs'?'1':'0',c:state.demoScenario==='missingDocs'?'#d97706':C.t},{l:'Settled',v:'5',c:C.t}]}
+        stats={[{l:'Submitted today',v:'9',c:C.p},{l:'Returned',v:state.demoScenario==='returnedClaim' || state.claimStatus==='returned'?'3':'0',c:state.demoScenario==='returnedClaim' || state.claimStatus==='returned'?C.e:C.t},{l:'Settled',v:'5',c:C.t},{l:'Resubmissions',v:`${state.resubmissionCount || 0}`,c:C.sec}]}
         actions={[
           <CTA key="claimsOpen" ch="Open intake issue" sm icon="warning" onClick={()=>setView('intake')}/>,
-          <CTA key="timeline" ch="View timeline" sm icon="history" onClick={()=>setUiNotice(setState,'Hospital claim timeline refreshed.',C.p)}/>
+          <CTA key="timeline" ch="View timeline" sm icon="history" onClick={()=>setUiNotice(setState,'Hospital claim timeline refreshed.',C.p)}/>,
+          <CTA key="resubmit" ch="Open denial loop" sm icon="assignment_returned" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,demoScenario:'returnedClaim',claimStatus:'returned'}),{actor:'Hospital Claims Desk',text:'Opened denial-management loop from hospital claims page.',tone:C.e})}/>
         ]}>
-        <ActivityTimeline items={state.activities} title="Claim synchronization"/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <ActivityTimeline items={state.activities} title="Claim synchronization"/>
+          <ReworkLoopCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     analytics: (
@@ -1335,7 +1595,10 @@ function HospitalHIS({state,setState,advance}: any) {
         actions={[
           <CTA key="logs" ch="Review engine logs" sm icon="monitoring" onClick={()=>setUiNotice(setState,'Verification engine logs opened for review.',C.sec)}/>
         ]}>
-        <DataQualityCard scenario={state.demoScenario || 'healthy'}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <DataQualityCard scenario={state.demoScenario || 'healthy'}/>
+          <NationalExchangeCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     settings: (
@@ -1748,12 +2011,15 @@ function MedicodePlatform({state,setState,advance}: any) {
         eyebrow="MediCode Platform"
         title="Payer Rules"
         summary="Review payer-specific coding edits, policy exceptions, and straight-through automation thresholds."
-        stats={[{l:'Active rulebooks',v:'24',c:C.p},{l:'Policy conflicts',v:state.demoScenario==='policyMismatch'?'3':'0',c:state.demoScenario==='policyMismatch'?C.e:C.t},{l:'Automation rate',v:'82%',c:C.t}]}
+        stats={[{l:'Active rulebooks',v:'24',c:C.p},{l:'Policy conflicts',v:state.demoScenario==='policyMismatch'?'3':'0',c:state.demoScenario==='policyMismatch'?C.e:C.t},{l:'Automation rate',v:'82%',c:C.t},{l:'TPA adapters',v:'4',c:C.sec}]}
         actions={[
           <CTA key="override" ch="Create override case" sm icon="gavel" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,overrideCaseCreated:true}),{actor:'MediCode Rules',text:'Prepared insurer override package from payer rules page',tone:C.e})}/>,
           <CTA key="review" ch="Open adjudication" sm icon="rate_review" onClick={()=>setView('adjudication')}/>
         ]}>
-        <ExceptionActionsCard state={state} setState={setState}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <ExceptionActionsCard state={state} setState={setState}/>
+          <TpaAdapterCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     claims: (
@@ -1764,9 +2030,13 @@ function MedicodePlatform({state,setState,advance}: any) {
         stats={[{l:'Queued',v:'18',c:C.p},{l:'Blocked',v:state.demoScenario==='missingDocs'||state.demoScenario==='consentHold'?'4':'1',c:(state.demoScenario==='missingDocs'||state.demoScenario==='consentHold')?'#d97706':C.sec},{l:'Sent today',v:'11',c:C.t}]}
         actions={[
           <CTA key="sendNow" ch="Go to send flow" sm icon="send" onClick={()=>setView('coding')}/>,
-          <CTA key="refreshClaims" ch="Refresh worklist" sm icon="sync" onClick={()=>setUiNotice(setState,'Claims worklist refreshed from coding and payer systems.',C.p)}/>
+          <CTA key="refreshClaims" ch="Refresh worklist" sm icon="sync" onClick={()=>setUiNotice(setState,'Claims worklist refreshed from coding and payer systems.',C.p)}/>,
+          <CTA key="rework" ch="Returned queue" sm icon="assignment_returned" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,demoScenario:'returnedClaim',claimStatus:'returned'}),{actor:'MediCode Workflow',text:'Opened returned-claim queue from claims worklist.',tone:C.e})}/>
         ]}>
-        <ActivityTimeline items={state.activities} title="Claim operations"/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <ActivityTimeline items={state.activities} title="Claim operations"/>
+          <ReworkLoopCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     analytics: (
@@ -1778,7 +2048,10 @@ function MedicodePlatform({state,setState,advance}: any) {
         actions={[
           <CTA key="reviewUpdates" ch="Review updates" sm icon="analytics" onClick={()=>setUiNotice(setState,'Compliance and model update report opened.',C.sec)}/>
         ]}>
-        <DataQualityCard scenario={state.demoScenario || 'healthy'}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <DataQualityCard scenario={state.demoScenario || 'healthy'}/>
+          <NationalExchangeCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     settings: (
@@ -1814,7 +2087,10 @@ function MedicodePlatform({state,setState,advance}: any) {
         {(view==='coding'||view==='workbench')&&
           <CodingWorkbench state={state} setState={setState} codeState={codeState} onCode={handleCode} fraudDone={fraudDone}
             fraudLoading={fraudLoading} onRunFraud={runFraud} allAccepted={allAccepted}
-            onPush={()=>{advance(10);setState(s=>({...s,claimStatus:'submitted'}));}}/>}
+            onPush={()=>{
+              advance(10);
+              setState(s=>({...s,claimStatus:s.claimTrack==='reimbursement'?'reimbursement-submitted':'submitted'}));
+            }}/>}
         {view==='adjudication'&&<ClaimAdj state={state} setState={setState} advance={advance}/>}
         {mediPages[view] && mediPages[view]}
       </div>
@@ -1907,8 +2183,11 @@ function MediDash({state,setState,onWorkbench,onAdj}: any) {
 
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
           <ScenarioToggle scenario={scenario} setScenario={(demoScenario:any)=>setState((s:any)=>({...s,demoScenario}))}/>
+          <ClaimTrackCard state={state} setState={setState}/>
+          <NationalExchangeCard state={state} setState={setState}/>
           <DataQualityCard scenario={scenario}/>
           <ExceptionActionsCard state={state} setState={setState}/>
+          <TpaAdapterCard state={state} setState={setState}/>
           <h3 style={{fontSize:18,fontWeight:700,color:C.oS}}>Active Coverage Analysis</h3>
           <div style={{background:'rgba(255,255,255,0.65)',backdropFilter:'blur(20px)',
             WebkitBackdropFilter:'blur(20px)',borderRadius:24,padding:24,
@@ -1984,7 +2263,7 @@ function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading
   ];
   const hMap = {blue:{bg:'#dbeafe',c:'#1e40af',b:'#3b82f6'},amber:{bg:'#fef3c7',c:'#92400e',b:'#f59e0b'},green:{bg:C.tF,c:C.t,b:C.t},gray:{bg:C.sX,c:C.oS,b:C.oV}};
   const scenarioMeta = SCENARIO_META[scenario];
-  const canSubmit = fraudDone && allAccepted && scenario!=='missingDocs' && scenario!=='consentHold' && scenario!=='lowConfidence';
+  const canSubmit = fraudDone && allAccepted && !['missingDocs','consentHold','lowConfidence','returnedClaim'].includes(scenario);
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 96px)'}}>
@@ -2033,6 +2312,9 @@ function CodingWorkbench({state,setState,codeState,onCode,fraudDone,fraudLoading
                 {scenario==='lowConfidence' && 'The assessment contains symptoms and history, but the final coded condition is still ambiguous and needs coder justification.'}
                 {scenario==='policyMismatch' && 'Clinical story is coherent, but policy and benefit rules conflict with the planned reimbursement path.'}
                 {scenario==='consentHold' && 'Clinical data is available, but downstream sharing is paused until patient consent for insurer submission is renewed.'}
+                {scenario==='returnedClaim' && 'The original claim has already been returned once, so this packet must include corrected tariffs, denial reason mapping, and resubmission evidence.'}
+                {scenario==='reimbursement' && 'Because this is reimbursement, the packet needs discharge documents, payment receipts, and member bank payout details instead of live pre-auth.'}
+                {scenario==='pmjay' && 'This claim follows PM-JAY package coding, beneficiary entitlement checks, and state-scheme reporting requirements.'}
                 {scenario==='healthy' && 'Narrative, documents, and policy references are aligned well enough for explainable straight-through processing.'}
               </p>
             </div>
@@ -2334,10 +2616,22 @@ function InsurerPortal({state,setState,advance}: any) {
 
   const decide = d => {
     setDecision(d);
-    applyStateUpdate(setState, (s:any)=>({...s,claimDecision:d,claimStatus:d==='approved'?'approved':d==='rejected'?'rejected':'query-raised'}), {
+    applyStateUpdate(setState, (s:any)=>({
+      ...s,
+      claimDecision:d,
+      claimStatus:d==='approved'?'approved':d==='rejected'?'denied':d==='returned'?'returned':'query-raised',
+      denialLoopStatus:d==='returned'?'Returned to hospital and MediCode for correction':s.denialLoopStatus,
+      queryToHospitalOpen:d==='query' ? true : s.queryToHospitalOpen,
+    }), {
       actor:'Insurer Review',
-      text:d==='approved'?'Insurer approved claim and initiated payment.':d==='rejected'?'Insurer rejected claim after review.':'Insurer raised a query for additional documents.',
-      tone:d==='approved'?C.t:d==='rejected'?C.e:C.sec,
+      text:d==='approved'
+        ?'Insurer approved claim and initiated payment.'
+        :d==='rejected'
+          ?'Insurer denied claim after review.'
+          :d==='returned'
+            ?'Insurer returned claim for hospital re-work and resubmission.'
+            :'Insurer raised a query for additional documents.',
+      tone:d==='approved'?C.t:d==='rejected'||d==='returned'?C.e:C.sec,
     });
     advance(12);
     setTimeout(()=>advance(13),600);
@@ -2348,12 +2642,16 @@ function InsurerPortal({state,setState,advance}: any) {
         eyebrow="Insurer Portal"
         title="Claims Command Center"
         summary="High-level claims operations view for pending approvals, escalations, exception load, and service levels across the insurer queue."
-        stats={[{l:'Pending review',v:'12',c:'#d97706'},{l:'Overrides',v:state.overrideCaseCreated?'1':'0',c:state.overrideCaseCreated?C.e:C.t},{l:'Approved today',v:'34',c:C.t}]}
+        stats={[{l:'Pending review',v:'12',c:'#d97706'},{l:'Overrides',v:state.overrideCaseCreated?'1':'0',c:state.overrideCaseCreated?C.e:C.t},{l:'Approved today',v:'34',c:C.t},{l:'SLA breaches',v:state.demoScenario==='returnedClaim'?'3':'1',c:state.demoScenario==='returnedClaim'?C.e:C.sec}]}
         actions={[
           <CTA key="openQueue" ch="Open claims queue" sm icon="receipt_long" onClick={()=>setView('claims')}/>,
-          <CTA key="compliance" ch="Open compliance" sm icon="policy" onClick={()=>setView('compliance')}/>
+          <CTA key="compliance" ch="Open compliance" sm icon="policy" onClick={()=>setView('compliance')}/>,
+          <CTA key="queryHospital" ch="Query hospital" sm icon="forum" onClick={()=>applyStateUpdate(setState,(s:any)=>({...s,queryToHospitalOpen:true}),{actor:'Insurer Portal',text:'Opened insurer-to-hospital clarification query from command center.',tone:C.sec})}/>
         ]}>
-        <ActivityTimeline items={state.activities} title="Insurer activity"/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <ActivityTimeline items={state.activities} title="Insurer activity"/>
+          <ReworkLoopCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     compliance: (
@@ -2366,7 +2664,10 @@ function InsurerPortal({state,setState,advance}: any) {
           <CTA key="reviewClaim" ch="Open review detail" sm icon="rate_review" onClick={()=>setView('detail')}/>,
           <CTA key="export" ch="Export audit packet" sm icon="download" onClick={()=>setUiNotice(setState,'Audit packet prepared for export.',C.t)}/>
         ]}>
-        <ComplianceAuditSidebar scenario={state.demoScenario || 'healthy'} activities={state.activities}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,alignItems:'start'}}>
+          <ComplianceAuditSidebar scenario={state.demoScenario || 'healthy'} activities={state.activities}/>
+          <NationalExchangeCard state={state} setState={setState}/>
+        </div>
       </PortalModulePage>
     ),
     analytics: (
@@ -2374,11 +2675,18 @@ function InsurerPortal({state,setState,advance}: any) {
         eyebrow="Insurer Portal"
         title="Adjudication Analytics"
         summary="Track approval velocity, exception frequency, and reviewer workload across cashless and reimbursement claims."
-        stats={[{l:'Median decision time',v:'4m',c:C.p},{l:'Manual reviews',v:'18%',c:C.sec},{l:'Query rate',v:'6%',c:'#d97706'}]}
+        stats={[{l:'Median decision time',v:'4m',c:C.p},{l:'Manual reviews',v:'18%',c:C.sec},{l:'Query rate',v:'6%',c:'#d97706'},{l:'Reimbursement share',v:state.claimTrack==='reimbursement'?'31%':'18%',c:C.t}]}
         actions={[
-          <CTA key="refreshAnalytics" ch="Refresh analytics" sm icon="insights" onClick={()=>setUiNotice(setState,'Adjudication analytics refreshed.',C.p)}/>
+          <CTA key="refreshAnalytics" ch="Refresh analytics" sm icon="insights" onClick={()=>setUiNotice(setState,'Adjudication analytics refreshed.',C.p)}/>,
+          <CTA key="slaReport" ch="Compliance report" sm icon="summarize" onClick={()=>setUiNotice(setState,'SLA and compliance report generated for insurer operations.',C.t)}/>
         ]}>
-        <ActivityTimeline items={state.activities} title="Decision analytics"/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18}}>
+          <ActivityTimeline items={state.activities} title="Decision analytics"/>
+          <div style={{display:'flex',flexDirection:'column',gap:18}}>
+            <ReworkLoopCard state={state} setState={setState}/>
+            <ClaimTrackCard state={state} setState={setState}/>
+          </div>
+        </div>
       </PortalModulePage>
     ),
     settings: (
@@ -2448,7 +2756,7 @@ function InsurerQueue({onReview,state,setState}: any) {
 
       <div style={{background:C.s0,borderRadius:16,overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,0.04)'}}>
         <div style={{padding:'14px 24px',background:C.sL,display:'flex',gap:8}}>
-          {['All Claims','Pending Review','Approved','Rejected'].map(t=>(
+          {['All Claims','Pending Review','Returned','Approved','Rejected'].map(t=>(
             <button key={t} onClick={()=>{setFilter(t);setUiNotice(setState,`Insurer queue filter set to ${t}.`,C.p);}} style={{padding:'6px 16px',borderRadius:8,background:filter===t?C.s0:'transparent',
               color:filter===t?C.p:C.oSV,fontWeight:filter===t?700:500,fontSize:12,border:'none',cursor:'pointer',
               boxShadow:filter===t?'0 1px 4px rgba(0,0,0,0.06)':'none'}}>{t}</button>
@@ -2503,6 +2811,12 @@ function InsurerDetail({decision,onDecide,notes,setNotes,state,setState,onBack}:
   const scenario = state.demoScenario || 'healthy';
   const recommendedAction = scenario==='policyMismatch'
     ? 'Query / Create override case'
+    : scenario==='returnedClaim'
+      ? 'Return to hospital for re-work'
+      : scenario==='reimbursement'
+        ? 'Validate payout packet'
+        : scenario==='pmjay'
+          ? 'Run PM-JAY package checks'
     : scenario==='missingDocs'
       ? 'Hold for documents'
       : scenario==='consentHold'
@@ -2517,6 +2831,8 @@ function InsurerDetail({decision,onDecide,notes,setNotes,state,setState,onBack}:
       <div style={{display:'flex',gap:8,marginBottom:8}}>
         <Bdg ch="Claim #CLM-2024-001" bg={C.sFx} col={C.sec}/>
         <Bdg ch="Network Hospital" bg={C.tF} col={C.t}/>
+        <Bdg ch={(state.claimTrack || 'cashless')==='cashless'?'Cashless':'Reimbursement'} bg={(state.claimTrack || 'cashless')==='cashless'?C.pFx:C.sFx} col={(state.claimTrack || 'cashless')==='cashless'?C.p:C.sec}/>
+        {(state.schemeType || 'private')==='pmjay' && <Bdg ch="AB-PMJAY" bg="#ccfbf1" col="#0f766e"/>}
       </div>
       <h1 style={{fontSize:30,fontWeight:900,color:C.oS,letterSpacing:'-0.02em',marginBottom:4}}>Claim Adjudication Review</h1>
       <p style={{color:C.oSV,fontSize:14,marginBottom:24}}>{state.name||'Ravi Kumar'} • Policy: {state.policy||'POL-2024-004521'} • {state.insurer||'Star Health'}</p>
@@ -2638,9 +2954,13 @@ function InsurerDetail({decision,onDecide,notes,setNotes,state,setState,onBack}:
                 color:C.sec,background:'transparent',border:'none',cursor:'pointer',borderRadius:8,
                 transition:'background 0.1s'}} onMouseEnter={e=>e.currentTarget.style.background=C.sL}
                 onMouseLeave={e=>e.currentTarget.style.background='transparent'}>Query/Hold</button>
+              <button onClick={()=>onDecide('returned')} style={{padding:'10px 18px',fontSize:13,fontWeight:700,
+                color:C.e,border:`2px solid rgba(186,26,26,0.15)`,background:'transparent',cursor:'pointer',borderRadius:8}}>
+                Return to Hospital
+              </button>
               <button onClick={()=>onDecide('rejected')} style={{padding:'10px 18px',fontSize:13,fontWeight:700,
                 color:C.e,border:`2px solid rgba(186,26,26,0.15)`,background:'transparent',cursor:'pointer',borderRadius:8}}>
-                Reject Claim
+                Deny Claim
               </button>
               <CTA ch="Approve Claim" onClick={()=>onDecide('approved')} icon="check_circle"/>
             </div>
@@ -2662,7 +2982,9 @@ export default function App() {
     sumInsured:'5,00,000',validity:'31/03/2026',gender:'Male',aadhaar:'5678 9012 3456',
     tpa:'MediAssist',coverageType:'Comprehensive Care',policyStart:'01/04/2025',
     providerSearch:'San Francisco, CA',providerType:'Hospitals',providerSpecialty:'Cardiology',
-    profileSaved:false,selectedProvider:'Mission Health Diagnostics',
+    profileSaved:false,selectedProvider:'Mission Health Diagnostics',claimTrack:'cashless',
+    schemeType:'private',tpaAdapter:'Medi Assist',denialLoopStatus:'Not triggered',
+    resubmissionCount:0,queryToHospitalOpen:false,
     selectedHospital:{name:'Apollo Hospitals'},selectedSlot:'04:00 PM',
     claimStatus:null,claimDecision:null,estCost:'12,500',preAuthSent:false,demoScenario:'healthy',
     uploadedDocs:['Pre-auth form'],
